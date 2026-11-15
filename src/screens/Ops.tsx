@@ -4,7 +4,8 @@ import { activePlayers, ownsRole } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
 import { objectiveStatus } from '../../shared/score.ts'
 import type { SimPoint } from '../../shared/types.ts'
-import { liveFrom, OrbitStage } from '../stages.tsx'
+import { GraphicsToggle, OrbitView } from '../scene3d.tsx'
+import { liveFrom } from '../stages.tsx'
 import { Term, useCtx } from '../ui.tsx'
 import { Feed } from './Design.tsx'
 
@@ -79,7 +80,8 @@ export function Ops() {
           {sim.eventSchedule.map((e) => <span key={e.day} className="ev" style={{ left: `${(e.day / sim.plannedDays) * 100}%` }} title="Event" />)}
         </div>
         <div className="scene stage-card">
-          <OrbitStage design={design} sc={sc} live={liveFrom(sim, state.pendingEvent?.templateId ?? null)} />
+          <GraphicsToggle />
+          <OrbitView design={design} sc={sc} live={liveFrom(sim, state.pendingEvent?.templateId ?? null)} />
           <div className="scene-hud">
             <span className="chip">Year {Math.min(sc.lifetimeYears, Math.floor(sim.day / 365) + 1)} · day {sim.day % 365}</span>
             <span className={`chip ${sim.health < 50 ? 'bad' : ''}`}>♥ {Math.round(sim.health)}%</span>

@@ -4,7 +4,7 @@ import { ownsRole } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
 import { Medal } from '../art.tsx'
 import { computeMetrics } from '../../shared/calc.ts'
-import { CraftStage } from '../stages.tsx'
+import { CraftView, GraphicsToggle } from '../scene3d.tsx'
 import { useCtx } from '../ui.tsx'
 
 interface Entry { key: string; team: string; score: number; tier: string; summary: string; date: string }
@@ -103,7 +103,7 @@ export function Report() {
       <aside className="side">
         <div className="panel">
           <h3>Your spacecraft</h3>
-          <div className="stage-card" style={{ marginBottom: 8 }}><CraftStage design={design} sc={sc} m={computeMetrics(design, sc)} /></div>
+          <div className="stage-card" style={{ marginBottom: 8 }}><GraphicsToggle /><CraftView design={design} sc={sc} m={computeMetrics(design, sc)} /></div>
           {r.stats.map((s) => <div key={s.label} className="inst-row"><span className="muted">{s.label}</span><span className="mono">{s.value}</span></div>)}
         </div>
         <div className="panel stack">

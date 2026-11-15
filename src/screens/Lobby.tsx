@@ -94,7 +94,7 @@ export function Lobby() {
             <input type="checkbox" checked={state.relaxed} onChange={(e) => dispatch({ type: 'setRelaxed', relaxed: e.target.checked })} />
             Relaxed mode: no design timer (good for classrooms and first plays)
           </label>
-          <button className="btn primary big" disabled={!canStart} onClick={() => dispatch({ type: 'startDesign' })}>Start design phase</button>
+          <button className="btn primary big" disabled={!canStart} onClick={() => dispatch({ type: 'startDesign' })}>Start mission briefing →</button>
           {!state.scenarioId && <span className="small faint">Pick a mission brief first.</span>}
           {state.scenarioId && team && missing.length > 0 && <span className="small warn">Still open: {missing.map((r) => ROLE_NAMES[r]).join(', ')}</span>}
         </div>

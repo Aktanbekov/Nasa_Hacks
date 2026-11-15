@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ROLE_NAMES } from '../shared/game.ts'
 import { getScenario } from '../shared/scenarios.ts'
+import { Briefing } from './screens/Briefing.tsx'
 import { Design } from './screens/Design.tsx'
 import { Home } from './screens/Home.tsx'
 import { Launch } from './screens/Launch.tsx'
@@ -75,6 +76,7 @@ export default function App() {
       </header>
       {error && <div className="page error">{error}</div>}
       {state.phase === 'lobby' && <Lobby />}
+      {state.phase === 'briefing' && <Briefing />}
       {state.phase === 'design' && <Design />}
       {state.phase === 'review' && <Review />}
       {state.phase === 'launch' && <Launch />}

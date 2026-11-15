@@ -34,6 +34,7 @@ export type Action =
   | { type: 'chooseScenario'; playerId: string; scenarioId: string }
   | { type: 'setRelaxed'; relaxed: boolean }
   | { type: 'startDesign'; playerId: string }
+  | { type: 'ready'; playerId: string; value: boolean }
   | { type: 'setDesign'; playerId: string; patch: Partial<Design> }
   | { type: 'toggleInstrument'; playerId: string; instrumentId: string }
   | { type: 'chat'; playerId: string; text: string }
@@ -51,7 +52,7 @@ export type Action =
 export function createGame(code: string, mode: 'solo' | 'team', now: number): GameState {
   return {
     code, mode, phase: 'lobby', scenarioId: null, relaxed: false, players: {}, hostId: '',
-    design: null, designStartedAt: 0, overtimeM: 0, opsAcc: 0, feed: [], feedSeq: 0, approvals: {}, reviewAttempts: 0,
+    design: null, designStartedAt: 0, overtimeM: 0, opsAcc: 0, feed: [], feedSeq: 0, approvals: {}, ready: {}, reviewAttempts: 0,
     launch: null, sim: null, pendingEvent: null, votes: {}, speed: 1, paused: false, report: null,
     seed: newSeed(), flight: 1, rev: 0, now,
   }
@@ -89,6 +90,7 @@ function startDesign(s: GameState, now: number) {
 
 export function reduce(s: GameState, a: Action, now: number): GameState {
   s.now = now
+  if (!s.ready) s.ready = {} // rooms saved before the briefing phase existed
   switch (a.type) {
     case 'join': {
       const existing = s.players[a.playerId]
@@ -126,10 +128,19 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       s.relaxed = a.relaxed
       break
     case 'startDesign':
+      // Lobby -> story briefing. The design timer starts only when everyone is ready.
       if (s.phase !== 'lobby' || !s.scenarioId) break
       if (s.mode === 'team' && uncoveredRoles(s).length) break
-      startDesign(s, now)
+      s.phase = 'briefing'
+      s.ready = {}
       break
+    case 'ready': {
+      if (s.phase !== 'briefing') break
+      s.ready[a.playerId] = a.value
+      const everyone = activePlayers(s).every((p) => s.ready[p.id])
+      if (s.mode === 'solo' || everyone) startDesign(s, now)
+      break
+    }
     case 'setDesign':
     case 'toggleInstrument': {
       if (s.phase !== 'design' || !s.design || !s.scenarioId) break

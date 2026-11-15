@@ -281,7 +281,7 @@ export interface Report {
   launchFailed: boolean
 }
 
-export type Phase = 'lobby' | 'design' | 'review' | 'launch' | 'ops' | 'report'
+export type Phase = 'lobby' | 'briefing' | 'design' | 'review' | 'launch' | 'ops' | 'report'
 
 export interface GameState {
   code: string
@@ -299,6 +299,8 @@ export interface GameState {
   feed: FeedItem[]
   feedSeq: number
   approvals: Record<string, boolean>
+  /** Players who finished the story briefing and are ready to design. */
+  ready: Record<string, boolean>
   reviewAttempts: number
   launch: { success: boolean; at: number } | null
   sim: SimState | null

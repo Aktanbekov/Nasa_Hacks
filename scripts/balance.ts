@@ -32,6 +32,7 @@ for (const [k, t] of designs.entries()) {
     reduce(s, { type: 'join', playerId: 'p', name: 'Tester' }, now)
     reduce(s, { type: 'chooseScenario', playerId: 'p', scenarioId: sc.id }, now)
     reduce(s, { type: 'startDesign', playerId: 'p' }, now)
+    reduce(s, { type: 'ready', playerId: 'p', value: true }, now)
     s.design = design
     reduce(s, { type: 'goReview', playerId: 'p' }, now)
     reduce(s, { type: 'launch', playerId: 'p' }, now)

@@ -1,5 +1,6 @@
 import { ROCKETS, byId } from '../../shared/catalog.ts'
 import { RocketShape } from '../art.tsx'
+import { LaunchView, useGraphics } from '../scene3d.tsx'
 import { useCtx } from '../ui.tsx'
 import { useClock } from './Design.tsx'
 
@@ -9,6 +10,7 @@ export function Launch() {
   const launch = state.launch!
   const rocket = byId(ROCKETS, state.design!.rocketId)
   const t = (now() - launch.at) / 1000
+  const three = useGraphics()
   let caption: React.ReactNode
   if (t < 1.6) caption = <div className="count">T−{Math.max(1, 3 - Math.floor(t / 0.55))}</div>
   else if (t < 3.2) caption = <h2>Liftoff!</h2>
@@ -18,14 +20,13 @@ export function Launch() {
 
   return (
     <main className="launch-stage" aria-live="polite">
-      <div className="stars" />
+      {three && <LaunchView rocketId={rocket.id} success={launch.success} elapsed={() => (now() - launch.at) / 1000} />}
       <div className="launch-caption">{caption}</div>
-      <div className="ground" />
-      <div className="pad" />
-      <svg className={`rocket ${launch.success ? 'go' : 'fail'}`} viewBox="0 0 120 300" style={{ width: 120, marginLeft: -60, bottom: 14 }} aria-label={rocket.name}>
+      {!three && <><div className="stars" /><div className="ground" /><div className="pad" /></>}
+      {!three && <svg className={`rocket ${launch.success ? 'go' : 'fail'}`} viewBox="0 0 120 300" style={{ width: 120, marginLeft: -60, bottom: 14 }} aria-label={rocket.name}>
         <RocketShape id={rocket.id} x={60} base={236} scale={rocket.id === 'small' ? 4.4 : 3.9} flame />
-      </svg>
-      {!launch.success && <div className="boom" />}
+      </svg>}
+      {!three && !launch.success && <div className="boom" />}
     </main>
   )
 }

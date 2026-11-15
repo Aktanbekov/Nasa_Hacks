@@ -7,7 +7,7 @@ import { overtimeCost, ownsRole, ROLE_NAMES, ROLE_SHORT } from '../../shared/gam
 import { getScenario } from '../../shared/scenarios.ts'
 import { ROLES, type Design as DesignT, type Metrics, type Role, type Scenario } from '../../shared/types.ts'
 import { HudIcon, PartArt } from '../art.tsx'
-import { CraftStage, OrbitStage, RocketStage } from '../stages.tsx'
+import { CraftView, GraphicsToggle, OrbitView, RocketView } from '../scene3d.tsx'
 import { Avatar, INSTRUMENT_COLORS, Meter, OptionCard, ROLE_COLOR, Stat, Term, useCtx } from '../ui.tsx'
 
 export function useClock(ms = 1000) {
@@ -64,9 +64,10 @@ export function Design() {
                 </button>
               ))}
             </div>
-            {view === 'craft' && <CraftStage design={design} sc={sc} m={m} />}
-            {view === 'rocket' && <RocketStage design={design} sc={sc} m={m} />}
-            {view === 'orbit' && <OrbitStage design={design} sc={sc} />}
+            <GraphicsToggle />
+            {view === 'craft' && <CraftView design={design} sc={sc} m={m} />}
+            {view === 'rocket' && <RocketView design={design} sc={sc} m={m} />}
+            {view === 'orbit' && <OrbitView design={design} sc={sc} />}
           </div>
           <div className="crew">
             {adv.map((a) => (
@@ -164,7 +165,7 @@ export function Dashboard({ design, sc, m, overtime }: { design: DesignT; sc: Sc
   return (
     <div className="panel">
       <h3>Shared dashboard</h3>
-      <div className="stage-card" style={{ marginBottom: 4 }}><CraftStage design={design} sc={sc} m={m} /></div>
+      <div className="stage-card" style={{ marginBottom: 4 }}><GraphicsToggle /><CraftView design={design} sc={sc} m={m} /></div>
       <div className="stack" style={{ gap: 12, marginTop: 8 }}>
         <Meter label="Budget" value={m.costM} max={m.budgetM} tone={m.costM > m.budgetM ? 'bad' : m.costM > m.budgetM * 0.95 ? 'warn' : 'good'}
           text={`${fmtM(m.costM)} / ${fmtM(m.budgetM)}`}

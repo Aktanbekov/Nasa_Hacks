@@ -17,6 +17,11 @@ act({ type: 'claimRole', playerId: 'ada', role: 'science' })
 act({ type: 'claimRole', playerId: 'ben', role: 'engineer' })
 act({ type: 'claimRole', playerId: 'cy', role: 'comms' })
 act({ type: 'startDesign', playerId: 'ada' })
+assert.equal(s.phase, 'briefing', 'story briefing comes first')
+act({ type: 'ready', playerId: 'ada', value: true })
+act({ type: 'ready', playerId: 'ben', value: true })
+assert.equal(s.phase, 'briefing', 'waits for every player to finish the story')
+act({ type: 'ready', playerId: 'cy', value: true })
 assert.equal(s.phase, 'design')
 
 // Ben can't touch instruments; Ada can.
