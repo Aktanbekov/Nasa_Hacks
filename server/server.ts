@@ -3,6 +3,7 @@
 // Zero dependencies: plain node:http. In production it also serves the built app.
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { networkInterfaces } from 'node:os'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createGame, reduce, tick, TICK_MS, type Action } from '../shared/game.ts'
@@ -84,6 +85,14 @@ const server = createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean)
   try {
     if (parts[0] !== 'api') return serveStatic(req, res)
+
+    // GET /api/info -> this machine's network addresses, so join links work from phones
+    if (req.method === 'GET' && parts[1] === 'info') {
+      const addresses = Object.values(networkInterfaces()).flat()
+        .filter((a) => a && a.family === 'IPv4' && !a.internal)
+        .map((a) => a!.address)
+      return json(res, 200, { addresses })
+    }
 
     // POST /api/rooms -> create a team room
     if (req.method === 'POST' && parts[1] === 'rooms' && parts.length === 2) {

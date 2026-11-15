@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ROLE_NAMES } from '../shared/game.ts'
 import { getScenario } from '../shared/scenarios.ts'
+import { InviteOverlay } from './invite.tsx'
 import { Briefing } from './screens/Briefing.tsx'
 import { Design } from './screens/Design.tsx'
 import { Home } from './screens/Home.tsx'
@@ -20,6 +21,7 @@ export default function App() {
     return room && sessionStorage.getItem('lw-joined') === room ? { mode: 'team', code: room } : null
   })
   const { state, dispatch, error, connected, now } = useGame(session, playerId, name)
+  const [invite, setInvite] = useState(false)
 
   useEffect(() => {
     if (session?.mode === 'team') {
@@ -61,7 +63,8 @@ export default function App() {
         <div className="spacer" />
         {state.mode === 'team' && (
           <div className="row wrap" style={{ justifyContent: 'flex-end' }}>
-            <span className="chip mono" title="Room code">Room {state.code}</span>
+            <button className="chip mono chip-btn" title="Show the QR code to invite teammates" onClick={() => setInvite(true)}>▦ Room {state.code}</button>
+            {invite && <InviteOverlay code={state.code} onClose={() => setInvite(false)} />}
             {others.map((p) => (
               <span key={p.id} className="chip" title={p.roles.map((r) => ROLE_NAMES[r]).join(', ') || 'No role yet'}>
                 {p.name}{p.id === playerId ? ' (you)' : ''}

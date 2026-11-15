@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { activePlayers, ROLE_NAMES, uncoveredRoles } from '../../shared/game.ts'
 import { COMING_SOON, SCENARIOS } from '../../shared/scenarios.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
+import { InviteOverlay, InvitePanel } from '../invite.tsx'
 import { ScenarioArt } from '../stages.tsx'
 import { ROLE_COLOR, useCtx } from '../ui.tsx'
 
@@ -17,7 +19,7 @@ export function Lobby() {
   const missing = uncoveredRoles(state)
   const players = activePlayers(state)
   const canStart = !!state.scenarioId && (!team || missing.length === 0)
-  const shareUrl = `${location.origin}${location.pathname}?room=${state.code}`
+  const [big, setBig] = useState(false)
 
   return (
     <main className="page lobby">
@@ -60,13 +62,9 @@ export function Lobby() {
       <aside className="stack">
         {team && (
           <div className="panel">
-            <h3>Room code</h3>
-            <div className="code">{state.code}</div>
-            <p className="small muted">Teammates join from the home screen with this code, or with this link:</p>
-            <div className="row">
-              <input type="text" readOnly value={shareUrl} style={{ flex: 1, fontSize: 12 }} onFocus={(e) => e.target.select()} />
-              <button className="btn sm" onClick={() => navigator.clipboard?.writeText(shareUrl)}>Copy</button>
-            </div>
+            <h3>Invite your team ({players.length}/4)</h3>
+            <InvitePanel code={state.code} onExpand={() => setBig(true)} />
+            {big && <InviteOverlay code={state.code} onClose={() => setBig(false)} />}
           </div>
         )}
         <div className="panel">

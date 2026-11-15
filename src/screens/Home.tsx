@@ -12,14 +12,35 @@ export function Home({ name, setName, onStart }: { name: string; setName: (n: st
     setBusy(true); setError(null)
     try { onStart({ mode: 'team', code: await createRoom() }) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-  const join = async () => {
-    const c = code.trim().toUpperCase()
+  const join = () => joinCode(code)
+  const joinCode = async (raw: string) => {
+    const c = raw.trim().toUpperCase()
     setBusy(true); setError(null)
     try {
       const r = await fetch(`/api/rooms/${c}`)
       if (!r.ok) throw new Error('No room with that code. Check it with your team.')
       onStart({ mode: 'team', code: c })
     } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+
+  const invited = new URLSearchParams(location.search).get('room')?.toUpperCase()
+  if (invited) {
+    return (
+      <main className="invited">
+        <div className="invited-card rise">
+          <Logo size={44} />
+          <div className="brief-kicker" style={{ marginTop: 14 }}>You're invited to a mission</div>
+          <h1>Join team <span className="code" style={{ fontSize: 'inherit' }}>{invited}</span></h1>
+          <p className="muted">Launch Window: design, launch and fly a real science mission together. Enter your name to join.</p>
+          <form className="stack" onSubmit={(e) => { e.preventDefault(); if (!needName) { setCode(invited); void joinCode(invited) } }}>
+            <input type="text" value={name} maxLength={24} placeholder="Your name" onChange={(e) => setName(e.target.value)} autoFocus aria-label="Your name" style={{ fontSize: 18, padding: '12px 14px' }} />
+            <button className="btn primary big" disabled={needName || busy}>{busy ? 'Joining…' : `Join team ${invited} →`}</button>
+          </form>
+          {error && <p className="error">{error}</p>}
+          <button className="btn ghost sm" style={{ marginTop: 12 }} onClick={() => { history.replaceState(null, '', location.pathname); setCode(''); location.reload() }}>Not now, go to the home screen</button>
+        </div>
+      </main>
+    )
   }
 
   return (
