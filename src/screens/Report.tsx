@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { ORBITS, byId } from '../../shared/catalog.ts'
 import { ownsRole } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
-import { Spacecraft, INSTRUMENT_COLORS, useCtx } from '../ui.tsx'
+import { Medal } from '../art.tsx'
+import { computeMetrics } from '../../shared/calc.ts'
+import { CraftStage } from '../stages.tsx'
+import { useCtx } from '../ui.tsx'
 
 interface Entry { key: string; team: string; score: number; tier: string; summary: string; date: string }
 
@@ -43,6 +46,7 @@ export function Report() {
       <section className="stack">
         <div className="panel">
           <div className="row wrap" style={{ gap: 20, alignItems: 'flex-end' }}>
+            <Medal tier={r.tier} />
             <div>
               <span className={`tier ${r.tier}`}>{r.tier}</span>
               <h2 style={{ fontSize: 28, marginTop: 10 }}>{headline}</h2>
@@ -99,7 +103,7 @@ export function Report() {
       <aside className="side">
         <div className="panel">
           <h3>Your spacecraft</h3>
-          <Spacecraft design={design} instrumentColors={design.instruments.map((id) => INSTRUMENT_COLORS[sc.instruments.findIndex((i) => i.id === id) % INSTRUMENT_COLORS.length])} />
+          <div className="stage-card" style={{ marginBottom: 8 }}><CraftStage design={design} sc={sc} m={computeMetrics(design, sc)} /></div>
           {r.stats.map((s) => <div key={s.label} className="inst-row"><span className="muted">{s.label}</span><span className="mono">{s.value}</span></div>)}
         </div>
         <div className="panel stack">

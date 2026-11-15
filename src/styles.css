@@ -239,7 +239,7 @@ input[type=text]:focus { outline: none; border-color: var(--info); }
 .rocket { position: absolute; left: 50%; bottom: 78px; width: 60px; margin-left: -30px; transition: none; }
 .rocket.go { animation: liftoff 6s cubic-bezier(.5, 0, .9, .6) 1.6s forwards; }
 .rocket.fail { animation: liftfail 3.2s cubic-bezier(.5, 0, .9, .6) 1.6s forwards; }
-.flame { transform-origin: 50% 0; animation: flicker .08s infinite alternate; opacity: 0; }
+.flame { transform-box: fill-box; transform-origin: 50% 0; animation: flicker .08s infinite alternate; opacity: 0; }
 .rocket.go .flame, .rocket.fail .flame { animation: flicker .08s infinite alternate, ignite .2s 1.4s forwards; }
 @keyframes ignite { to { opacity: 1; } }
 @keyframes flicker { from { transform: scaleY(1); } to { transform: scaleY(1.25); } }
@@ -307,4 +307,82 @@ input[type=text]:focus { outline: none; border-color: var(--info); }
   .tiles { grid-template-columns: repeat(2, 1fr); }
   .loop { grid-template-columns: repeat(2, 1fr); }
   .options { grid-template-columns: 1fr; }
+}
+
+/* =================== Game visuals =================== */
+
+/* Hangar layout */
+.hangar-head { gap: 12px; margin-bottom: 12px; align-items: center; }
+.hangar-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); gap: 16px; align-items: start; margin-top: 14px; }
+.bay > * { flex-shrink: 0; }
+.bay { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 76px); overflow: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.tray .options { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+/* Stage */
+.stage-card { position: relative; background: #050913; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.stage { display: block; width: 100%; height: auto; }
+.stage-tabs { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 2px; padding: 3px; background: #0a0f1ccc; border: 1px solid var(--line-2); border-radius: 99px; backdrop-filter: blur(4px); }
+.stage-tabs button { border: 0; background: transparent; padding: 5px 12px; border-radius: 99px; font-size: 12.5px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.stage-tabs button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.stage .part { transition: filter .15s; }
+.stage .part:hover { filter: drop-shadow(0 0 6px #f5b544cc); }
+.pop { animation: pop .5s cubic-bezier(.2, 1.5, .4, 1); transform-box: fill-box; transform-origin: center; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.float { animation: float 6s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-6px); } }
+.beam-cone { animation: scan 2.4s ease-in-out infinite; }
+@keyframes scan { 50% { opacity: .05; } }
+.blink { animation: blink 1.2s steps(2, start) infinite; }
+@keyframes blink { to { opacity: .25; } }
+.beam { stroke: var(--good); stroke-width: 2; stroke-dasharray: 3 7; animation: packets .6s linear infinite; }
+.beam.relay { stroke: var(--engineer); }
+@keyframes packets { to { stroke-dashoffset: -10; } }
+.scenario-art { display: block; width: calc(100% + 36px); margin: -18px -18px 4px; height: auto; border-radius: 12px 12px 0 0; }
+
+/* HUD */
+.hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.gauge { display: flex; gap: 10px; align-items: flex-start; background: linear-gradient(180deg, #15203a, #101830); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; }
+.gauge::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--tone); }
+.gauge.good { --tone: var(--good); } .gauge.bad { --tone: var(--bad); } .gauge.warn { --tone: var(--warn); } .gauge.info { --tone: var(--info); }
+.gauge.bad { background: linear-gradient(180deg, #2a1622, #181425); border-color: #ff6b5a55; }
+.gauge-icon { width: 26px; height: 26px; color: var(--tone); flex: none; margin-top: 2px; }
+.gauge-body { min-width: 0; flex: 1; }
+.gauge-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.gauge-value { font-family: var(--mono); font-size: 18px; line-height: 1.25; color: var(--text); white-space: nowrap; }
+.gauge.bad .gauge-value { color: var(--bad); }
+.gauge-bar { height: 5px; background: #0a0f1c; border-radius: 99px; position: relative; margin: 4px 0 3px; overflow: visible; }
+.gauge-bar i { position: absolute; inset: 0 auto 0 0; background: var(--tone); border-radius: 99px; transition: width .35s; }
+.gauge-bar span { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .6; }
+.gauge-sub { font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Crew speech bubbles */
+.crew { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bubble { display: flex; gap: 8px; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 12px 12px 12px 4px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; }
+.bubble.bad { border-color: #ff6b5a77; background: #221626; }
+.bubble.good { border-color: #3ccf9e44; }
+
+/* Part cards with art */
+.opt.has-art { flex-direction: row; gap: 12px; align-items: flex-start; }
+.opt .art { width: 64px; height: 64px; flex: none; border-radius: 10px; background: radial-gradient(circle at 50% 40%, #22305a, #0d1427); border: 1px solid var(--line); padding: 4px; transition: transform .15s; }
+.opt:hover:not(:disabled) .art { transform: scale(1.06) rotate(-2deg); }
+.opt.sel .art { border-color: var(--accent); background: radial-gradient(circle at 50% 40%, #3a3a2a, #15182a); }
+.opt .opt-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+
+/* Ops scene */
+.scene { position: relative; }
+.scene .stage-card { border-radius: 14px; }
+.scene-hud { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.scene-hud .chip { background: #0a0f1cd9; border-color: var(--line-2); font-family: var(--mono); font-size: 12px; }
+
+@media (max-width: 1080px) {
+  .hangar-grid { grid-template-columns: 1fr; }
+  .bay { position: static; max-height: none; }
+}
+@media (max-width: 640px) {
+  .crew { grid-template-columns: 1fr; }
+  .hud { grid-template-columns: repeat(2, 1fr); }
+  .stage-tabs button { padding: 5px 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop, .float, .beam-cone, .blink, .beam, .flame { animation: none !important; }
 }

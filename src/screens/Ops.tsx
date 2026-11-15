@@ -4,6 +4,7 @@ import { activePlayers, ownsRole } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
 import { objectiveStatus } from '../../shared/score.ts'
 import type { SimPoint } from '../../shared/types.ts'
+import { liveFrom, OrbitStage } from '../stages.tsx'
 import { Term, useCtx } from '../ui.tsx'
 import { Feed } from './Design.tsx'
 
@@ -76,6 +77,15 @@ export function Ops() {
         <div className="progress" aria-label="Mission progress">
           <i style={{ width: `${pct * 100}%` }} />
           {sim.eventSchedule.map((e) => <span key={e.day} className="ev" style={{ left: `${(e.day / sim.plannedDays) * 100}%` }} title="Event" />)}
+        </div>
+        <div className="scene stage-card">
+          <OrbitStage design={design} sc={sc} live={liveFrom(sim, state.pendingEvent?.templateId ?? null)} />
+          <div className="scene-hud">
+            <span className="chip">Year {Math.min(sc.lifetimeYears, Math.floor(sim.day / 365) + 1)} · day {sim.day % 365}</span>
+            <span className={`chip ${sim.health < 50 ? 'bad' : ''}`}>♥ {Math.round(sim.health)}%</span>
+            <span className="chip">▲ {Math.round(sim.downlinkedGB).toLocaleString()} GB home</span>
+            {sim.lostGB > 0 && <span className="chip bad">✕ {Math.round(sim.lostGB).toLocaleString()} GB lost</span>}
+          </div>
         </div>
         <div className="tiles">
           <div className="tile"><div className="k">Data delivered</div><div className="v">{Math.round(sim.downlinkedGB).toLocaleString()} GB</div></div>

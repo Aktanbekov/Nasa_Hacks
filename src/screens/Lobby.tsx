@@ -1,6 +1,7 @@
 import { activePlayers, ROLE_NAMES, uncoveredRoles } from '../../shared/game.ts'
 import { COMING_SOON, SCENARIOS } from '../../shared/scenarios.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
+import { ScenarioArt } from '../stages.tsx'
 import { ROLE_COLOR, useCtx } from '../ui.tsx'
 
 const ROLE_INFO: Record<Role, { controls: string; wants: string }> = {
@@ -30,6 +31,7 @@ export function Lobby() {
             const sel = state.scenarioId === s.id
             return (
               <button key={s.id} className={`scenario ${sel ? 'sel' : ''}`} onClick={() => dispatch({ type: 'chooseScenario', scenarioId: s.id })} aria-pressed={sel}>
+                <ScenarioArt id={s.id} />
                 <div className="row"><h2>{s.name}</h2><span className="spacer" /><span className={`small diff-${s.difficulty}`}>{s.difficulty}</span></div>
                 <div className="muted small">{s.objective}</div>
                 <div className="facts">

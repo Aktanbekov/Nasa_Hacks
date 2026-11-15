@@ -55,23 +55,26 @@ export function Stat({ k, v }: { k: string; v: ReactNode }) {
   return <span className="stat">{k} <b>{v}</b></span>
 }
 
-export function OptionCard({ selected, locked, onClick, name, blurb, stats, note, multi, disabled, children }: {
+export function OptionCard({ selected, locked, onClick, name, blurb, stats, note, multi, disabled, children, art }: {
   selected: boolean; locked: boolean; onClick: () => void; name: string; blurb: string
-  stats?: ReactNode; note?: ReactNode; multi?: boolean; disabled?: boolean; children?: ReactNode
+  stats?: ReactNode; note?: ReactNode; multi?: boolean; disabled?: boolean; children?: ReactNode; art?: ReactNode
 }) {
   return (
     <button
-      className={`opt ${selected ? 'sel' : ''} ${locked ? 'locked' : ''}`}
+      className={`opt ${selected ? 'sel' : ''} ${locked ? 'locked' : ''} ${art ? 'has-art' : ''}`}
       onClick={onClick}
       disabled={locked || disabled}
       aria-pressed={selected}
     >
       <span className="check">{selected ? '✓' : multi ? '+' : ''}</span>
-      <span className="name">{name}</span>
-      <span className="blurb">{blurb}</span>
-      {stats && <span className="stats">{stats}</span>}
-      {children}
-      {note && <span className="note">{note}</span>}
+      {art && <span className="art">{art}</span>}
+      <span className="opt-body">
+        <span className="name">{name}</span>
+        <span className="blurb">{blurb}</span>
+        {stats && <span className="stats">{stats}</span>}
+        {children}
+        {note && <span className="note">{note}</span>}
+      </span>
     </button>
   )
 }
