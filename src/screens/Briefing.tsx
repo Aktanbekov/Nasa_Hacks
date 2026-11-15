@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fmtM } from '../../shared/calc.ts'
 import { activePlayers, ROLE_NAMES } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
 import { CHARACTERS, STORIES, type SceneId } from '../story.ts'
 import { useLiveFires } from '../live.ts'
@@ -28,7 +28,7 @@ function useTypewriter(text: string, cps = 48) {
 
 export function Briefing() {
   const { state } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const slides = STORIES[sc.id] ?? [{ kind: 'goal' as const }, { kind: 'howto' as const }]
   const [i, setI] = useState(0)
   const slide = slides[i]
@@ -93,7 +93,7 @@ function SceneCaption({ chapter, speaker, text, onNext, onBack }: { chapter: str
 
 function GoalCard({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const { state } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const must = sc.objectives.filter((o) => o.kind === 'primary')
   const bonus = sc.objectives.filter((o) => o.kind === 'bonus')
   return (
@@ -108,6 +108,12 @@ function GoalCard({ onNext, onBack }: { onNext: () => void; onBack: () => void }
         <div><b>{state.relaxed ? 'No timer' : `${sc.designMinutes} min`}</b><span>to design</span></div>
         <div><b className={`diff-${sc.difficulty}`}>{sc.difficulty}</b><span>difficulty</span></div>
       </div>
+      {sc.level && sc.level.id !== 'cadet' && (
+        <div className="growth-note" style={{ marginBottom: 16 }}>
+          <b>{sc.level.label} level:</b> budget cut to {Math.round(sc.level.budgetFactor * 100)}%, estimates grow {Math.round(sc.level.growth[0] * 100)}–{Math.round(sc.level.growth[1] * 100)}% at the design review, {sc.level.events} random events
+          {sc.level.advisors === 'none' ? ', no advisors' : ', advisors only warn'}{sc.level.autopilot ? '' : ', no autopilot'}. Score ×{sc.level.scoreMultiplier}.
+        </div>
+      )}
       <div className="brief-cols">
         <div>
           <h3>Must achieve</h3>
@@ -135,7 +141,7 @@ function GoalCard({ onNext, onBack }: { onNext: () => void; onBack: () => void }
 
 function HowTo({ onBack }: { onBack: () => void }) {
   const { state, dispatch, me } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const team = state.mode === 'team'
   const players = activePlayers(state)
   const myRoles = team ? (state.players[me]?.roles ?? []) : ROLES

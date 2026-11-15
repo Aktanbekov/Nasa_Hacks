@@ -4,7 +4,7 @@ import {
 } from '../../shared/catalog.ts'
 import { advisors, computeMetrics, downlinkPerDay, fmtM, parts, r1 } from '../../shared/calc.ts'
 import { overtimeCost, ownsRole, ROLE_NAMES, ROLE_SHORT } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { ROLES, type Design as DesignT, type Metrics, type Role, type Scenario } from '../../shared/types.ts'
 import { HudIcon, PartArt } from '../art.tsx'
 import { CraftView, GraphicsToggle, OrbitView, RocketView } from '../scene3d.tsx'
@@ -19,7 +19,7 @@ export function Timer() {
   const { state, now } = useCtx()
   useClock()
   if (state.relaxed || !state.scenarioId) return <span className="timer" title="Relaxed mode">no timer</span>
-  const sc = getScenario(state.scenarioId)
+  const sc = scenarioOf(state)
   const left = sc.designMinutes * 60 - Math.floor((now() - state.designStartedAt) / 1000)
   const over = left < 0
   const a = Math.abs(left)
@@ -32,7 +32,7 @@ export function Timer() {
 
 export function Design() {
   const { state, dispatch, me, now } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const design = state.design!
   useClock(5000)
   const overtime = overtimeCost(state, now())
@@ -40,7 +40,14 @@ export function Design() {
   const myRoles = ROLES.filter((r) => ownsRole(state, me, r))
   const [tab, setTab] = useState<Role>(myRoles[0] ?? 'lead')
   const [view, setView] = useState<StageView>(myRoles[0] === 'lead' ? 'orbit' : 'craft')
-  const adv = advisors(design, sc, m)
+  const advisorMode = sc.level?.advisors ?? 'full'
+  const VAGUE: Record<Role, string> = {
+    lead: 'Something about the budget, rocket or orbit is off. Check the numbers.',
+    science: 'I\'m not sure our payload meets every goal. Check the mission goals.',
+    engineer: 'One of my systems is out of limits. Check power, battery and pointing.',
+    comms: 'I\'m worried about getting all the data home. Check the downlink.',
+  }
+  const adv = advisors(design, sc, m).map((a) => (advisorMode === 'vague' ? { ...a, text: a.tone === 'bad' ? VAGUE[a.role] : 'My systems look OK, as far as I can tell.' } : a))
   const pickTab = (r: Role) => { setTab(r); setView(r === 'lead' ? 'orbit' : 'craft') }
 
   return (
@@ -69,6 +76,14 @@ export function Design() {
             {view === 'rocket' && <RocketView design={design} sc={sc} m={m} />}
             {view === 'orbit' && <OrbitView design={design} sc={sc} />}
           </div>
+          {design.growth && (
+            <div className="growth-note">
+              <b>Design matured at review:</b> mass +{Math.round(design.growth.mass * 100)}%, power +{Math.round(design.growth.power * 100)}%, hardware cost +{Math.round(design.growth.cost * 100)}%. These are now in every number above.
+            </div>
+          )}
+          {advisorMode === 'none' ? (
+            <div className="crew-silent">Flight Director level: no advisors. Read the dashboard yourself.</div>
+          ) : (
           <div className="crew">
             {adv.map((a) => (
               <div key={a.role} className={`bubble ${a.tone}`}>
@@ -77,12 +92,13 @@ export function Design() {
               </div>
             ))}
           </div>
+          )}
           <Feed />
         </section>
         <section className="tray">
           <div className="tabs" role="tablist" aria-label="Stations">
             {ROLES.map((r) => {
-              const alert = adv.find((a) => a.role === r)?.tone === 'bad'
+              const alert = advisorMode !== 'none' && adv.find((a) => a.role === r)?.tone === 'bad'
               const owner = Object.values(state.players).find((p) => p.connected && p.roles.includes(r))
               return (
                 <button key={r} role="tab" aria-selected={tab === r} className={`tab ${tab === r ? 'on' : ''}`} style={{ color: tab === r ? ROLE_COLOR[r] : undefined }} onClick={() => pickTab(r)}>

@@ -1,13 +1,13 @@
 import { ROCKETS, byId } from '../../shared/catalog.ts'
 import { canLaunch, computeMetrics, fmtM } from '../../shared/calc.ts'
 import { activePlayers, overtimeCost, ownsRole, ROLE_SHORT } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { Dashboard, Feed, Timer } from './Design.tsx'
 import { useCtx } from '../ui.tsx'
 
 export function Review() {
   const { state, dispatch, me, now } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const design = state.design!
   const overtime = overtimeCost(state, now())
   const m = computeMetrics(design, sc, overtime)
@@ -38,7 +38,7 @@ export function Review() {
               <div>
                 <b>{c.label}</b>{c.status === 'fail' && c.blocking && <span className="bad small"> · blocks launch</span>}
                 <div className="small muted">{c.detail}</div>
-                {c.fix && <div className="fix">{c.fix}</div>}
+                {c.fix && sc.level?.advisors !== 'none' && <div className="fix">{c.fix}</div>}
               </div>
             </div>
           ))}

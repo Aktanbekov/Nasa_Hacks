@@ -1,6 +1,6 @@
 // Mission briefs. Each scenario brings its own instruments, objectives,
 // allowed orbits/rockets/networks, random events and real missions to compare with.
-import type { Scenario } from './types.ts'
+import type { Difficulty, LevelRules, Objective, Scenario } from './types.ts'
 
 const wildfire: Scenario = {
   id: 'wildfire',
@@ -12,7 +12,7 @@ const wildfire: Scenario = {
   lifetimeYears: 3,
   designMinutes: 10,
   opsCostPerYearM: 5,
-  maxSatellites: 3,
+  maxSatellites: 4,
   orbits: ['leo-400', 'sso-600', 'geo'],
   rockets: ['rideshare', 'small', 'medium', 'heavy'],
   networks: ['gs-uni', 'gs-commercial', 'gs-nsn'],
@@ -23,6 +23,12 @@ const wildfire: Scenario = {
       blurb: 'Sees heat. Active fires glow brightly in thermal infrared, even through thin smoke and at night.',
       massKg: 12, powerW: 35, costM: 28, dataGBPerDay: 4, science: 100, pointingDeg: 0.1,
       objectives: { 'detect-fires': 1, revisit: 1, 'fire-risk': 0.2 },
+    },
+    {
+      id: 'compact-thermal', name: 'Compact thermal camera', kind: 'thermal',
+      blurb: 'A small-satellite heat camera: lower resolution than a big one, but cheap and light enough to fly on many satellites.',
+      massKg: 4, powerW: 10, costM: 8, dataGBPerDay: 1.2, science: 55, pointingDeg: 0.1,
+      objectives: { 'detect-fires': 0.8, revisit: 1 },
     },
     {
       id: 'swir', name: 'Shortwave infrared spectrometer', kind: 'spectral',
@@ -170,8 +176,52 @@ export const COMING_SOON = [
   { name: 'Europa Explorer', tagline: 'Jupiter\'s ocean moon: radiation, distance and a weak signal.', difficulty: 'Hard' },
 ]
 
-export const getScenario = (id: string): Scenario => {
-  const s = SCENARIOS.find((x) => x.id === id)
-  if (!s) throw new Error(`Unknown scenario ${id}`)
-  return s
+export const LEVELS: Record<Difficulty, LevelRules> = {
+  cadet: {
+    id: 'cadet', label: 'Cadet', blurb: 'Full budget, advisors tell you exactly what to fix, no surprises in your numbers. Learn the ropes.',
+    budgetFactor: 1, growth: [0, 0], events: 4, eventHarm: 1, autopilot: true, burnTolerance: 1, advisors: 'full', scoreMultiplier: 1,
+  },
+  engineer: {
+    id: 'engineer', label: 'Engineer', blurb: '85% budget. Advisors only warn that something is wrong. Estimates grow 5–15% at review, so you need margins. Tougher goals.',
+    budgetFactor: 0.85, growth: [0.05, 0.15], events: 5, eventHarm: 1.3, autopilot: true, burnTolerance: 1, advisors: 'vague', scoreMultiplier: 1.25,
+  },
+  director: {
+    id: 'director', label: 'Flight Director', blurb: '75% budget, no advisors, estimates grow 10–25%, six harsh events, no autopilot, the toughest goals.',
+    budgetFactor: 0.75, growth: [0.1, 0.25], events: 6, eventHarm: 1.6, autopilot: false, burnTolerance: 0.6, advisors: 'none', scoreMultiplier: 1.5,
+  },
 }
+
+/** Extra must-have goals on harder levels. */
+const EXTRA_GOALS: Record<string, Partial<Record<Difficulty, Objective[]>>> = {
+  wildfire: {
+    engineer: [{ id: 'fast-alerts', kind: 'primary', name: 'Alert crews within 3 hours (2 of 8 real fires)', blurb: 'In the real-fire replay, get the alert to the ground within 3 hours of ignition for at least 2 fires.', threshold: 0, minFastAlerts: 2 }],
+    director: [{ id: 'fast-alerts', kind: 'primary', name: 'Alert crews within 3 hours (3 of 8 real fires)', blurb: 'In the real-fire replay, get the alert to the ground within 3 hours of ignition for at least 3 fires.', threshold: 0, minFastAlerts: 3 }],
+  },
+  'lunar-ice': {
+    engineer: [{ id: 'data-home', kind: 'primary', name: 'Send home 95% of your data', blurb: 'At least 95% of everything your instruments collect must reach Earth.', threshold: 0, minDelivered: 0.95 }],
+    director: [{ id: 'data-home', kind: 'primary', name: 'Send home 95% of your data', blurb: 'At least 95% of everything your instruments collect must reach Earth.', threshold: 0, minDelivered: 0.95 }],
+  },
+}
+
+const cache = new Map<string, Scenario>()
+
+/** The scenario adjusted for a difficulty level: budget, goals and rules. */
+export const getScenario = (id: string, difficulty: Difficulty = 'cadet'): Scenario => {
+  const key = `${id}:${difficulty}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const base = SCENARIOS.find((x) => x.id === id)
+  if (!base) throw new Error(`Unknown scenario ${id}`)
+  const level = LEVELS[difficulty] ?? LEVELS.cadet
+  let objectives = [...base.objectives, ...(EXTRA_GOALS[id]?.[difficulty] ?? [])]
+  // Flight Director on the Moon: finding the cold traps becomes a must-have too.
+  if (difficulty === 'director' && id === 'lunar-ice') {
+    objectives = objectives.map((o) => (o.id === 'cold-traps' ? { ...o, kind: 'primary' as const } : o))
+  }
+  const sc: Scenario = { ...base, level, budgetM: Math.round(base.budgetM * level.budgetFactor), objectives }
+  cache.set(key, sc)
+  return sc
+}
+
+/** Scenario for a game state (its mission and difficulty). */
+export const scenarioOf = (s: { scenarioId: string | null; difficulty?: Difficulty }) => getScenario(s.scenarioId!, s.difficulty ?? 'cadet')

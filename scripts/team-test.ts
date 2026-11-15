@@ -91,3 +91,25 @@ console.log(s.report!.breakdown.map((b) => `${b.label}: ${b.points} (${b.detail}
 // JSON round-trip (what the server sends) must not lose anything important.
 const copy = JSON.parse(JSON.stringify(s))
 assert.equal(copy.report.score, s.report!.score)
+
+// ---- Difficulty: Flight Director rules
+{
+  let now2 = 0
+  const g = createGame('LVL', 'solo', now2)
+  const b = (a: Parameters<typeof reduce>[1]) => reduce(g, a, now2)
+  b({ type: 'join', playerId: 'p', name: 'P' })
+  b({ type: 'setDifficulty', playerId: 'p', difficulty: 'director' } as never)
+  b({ type: 'chooseScenario', playerId: 'p', scenarioId: 'wildfire' })
+  b({ type: 'startDesign', playerId: 'p' })
+  b({ type: 'ready', playerId: 'p', value: true })
+  assert.equal(g.difficulty, 'director')
+  b({ type: 'setDesign', playerId: 'p', patch: { growth: { mass: 0, power: 0, cost: 0 } } as never })
+  assert.equal(g.design!.growth, undefined, 'players cannot set growth')
+  b({ type: 'goReview', playerId: 'p' })
+  const gr = g.design!.growth!
+  assert.ok(gr.mass >= 0.1 && gr.mass <= 0.25, 'Director growth 10-25%')
+  b({ type: 'backToDesign', playerId: 'p' })
+  b({ type: 'goReview', playerId: 'p' })
+  assert.deepEqual(g.design!.growth, gr, 'growth is rolled once per design')
+  console.log(`Director rules OK: growth mass +${Math.round(gr.mass * 100)}%`)
+}

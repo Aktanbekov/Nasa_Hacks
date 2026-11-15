@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ROLE_NAMES } from '../shared/game.ts'
-import { getScenario } from '../shared/scenarios.ts'
+import { scenarioOf } from '../shared/scenarios.ts'
 import { InviteOverlay } from './invite.tsx'
 import { SourcesOverlay } from './screens/Sources.tsx'
 import { Briefing } from './screens/Briefing.tsx'
@@ -56,13 +56,13 @@ export default function App() {
   }
 
   const me = state.players[playerId]
-  const scenario = state.scenarioId ? getScenario(state.scenarioId) : null
+  const scenario = state.scenarioId ? scenarioOf(state) : null
   const others = Object.values(state.players).filter((p) => p.connected)
 
   return (
     <GameCtx.Provider value={{ state, dispatch, me: playerId, now }}>
       <header className="topbar">
-        <div className="brand"><Logo /><div>Launch Window<small>{scenario ? `${scenario.name} · Flight ${state.flight}` : 'Space mission design game'}</small></div></div>
+        <div className="brand"><Logo /><div>Launch Window<small>{scenario ? `${scenario.name} · ${scenario.level?.label ?? 'Cadet'} · Flight ${state.flight}` : 'Space mission design game'}</small></div></div>
         <Steps phase={state.phase} />
         <div className="spacer" />
         {state.mode === 'team' && (

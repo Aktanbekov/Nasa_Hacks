@@ -67,6 +67,7 @@ export const BASIS: Record<string, Basis> = {
   'gs-nsn': { note: 'NASA\'s Near Space Network combines ground stations and relay satellites. Contact time is a game estimate.', sources: ['soa-comms'] },
   // wildfire instruments
   'thermal-ir': { note: 'Modelled on thermal cameras like Landsat 9\'s TIRS-2 (100 m pixels) and ECOSTRESS.', sources: ['landsat9', 'ecostress'] },
+  'compact-thermal': { note: 'Small-satellite thermal cameras are what fire constellations like the planned FireSat fleet rely on: less sharp than Landsat-class instruments, but cheap enough to fly many. Values are illustrative.', sources: ['firms-faq'] },
   swir: { note: 'Fire detection uses short- and mid-wave infrared. From 705 km, MODIS routinely spots fires of about 1,000 m².', sources: ['firms-faq'] },
   'visible-cam': { note: 'Like Landsat 9\'s OLI-2 color imager (30 m pixels), used for burn-scar maps.', sources: ['landsat9'] },
   sounder: { note: 'Like TEMPO, which measures smoke and pollution over North America every hour.', sources: ['tempo'] },

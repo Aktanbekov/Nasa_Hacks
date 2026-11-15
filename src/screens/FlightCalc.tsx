@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ORBITS, byId } from '../../shared/catalog.ts'
 import { evalExpr, G, type CalcChallenge, type CalcResult } from '../../shared/flightcalc.ts'
 import { ownsRole } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { useCtx } from '../ui.tsx'
 
 const fmt = (n: number, d = 2) => n.toLocaleString(undefined, { maximumFractionDigits: d })
@@ -95,7 +95,7 @@ export function OrbitResult({ ratio, capture, moon, grade }: { ratio: number; ca
 
 export function FlightCalc() {
   const { state, dispatch, me } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const calc = state.calc!
   const ch = calc.challenge
   const res = calc.result
@@ -189,7 +189,9 @@ export function FlightCalc() {
           {!res && (
             <div className="row wrap">
               <button className="btn primary big" disabled={burnV === null || burnV <= 0} onClick={() => submit(false)}>Run the burn →</button>
-              <button className="btn ghost" onClick={() => submit(true)}>Use autopilot (no math points)</button>
+              {sc.level?.autopilot !== false
+                ? <button className="btn ghost" onClick={() => submit(true)}>Use autopilot (no math points)</button>
+                : <span className="small warn">Flight Director: no autopilot, and the accuracy bands are tighter.</span>}
               {state.mode === 'team' && <span className="small muted">Work it out together. Any player can run the burn, and it can't be undone.</span>}
             </div>
           )}

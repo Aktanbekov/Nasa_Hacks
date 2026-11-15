@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ORBITS, byId } from '../../shared/catalog.ts'
 import { ownsRole } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { fmtHours } from '../../shared/wildfires.ts'
 import { Medal } from '../art.tsx'
 import { computeMetrics } from '../../shared/calc.ts'
@@ -16,7 +16,7 @@ function loadBoard(scenarioId: string): Entry[] {
 
 export function Report() {
   const { state, dispatch, me } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const r = state.report!
   const design = state.design!
   const [board, setBoard] = useState<Entry[]>(() => loadBoard(sc.id))
@@ -28,7 +28,7 @@ export function Report() {
     if (entries.some((e) => e.key === key)) return
     const team = Object.values(state.players).filter((p) => p.roles.length).map((p) => p.name).join(', ')
     const summary = `${byId(ORBITS, design.orbitId).name.split(',')[0]} · ${design.satellites > 1 ? design.satellites + ' sats · ' : ''}${design.instruments.length} instruments`
-    entries.push({ key, team, score: r.score, tier: r.tier, summary, date: new Date().toLocaleDateString() })
+    entries.push({ key, team, score: r.score, tier: r.tier, summary: `${sc.level?.label ?? 'Cadet'} · ${summary}`, date: new Date().toLocaleDateString() })
     entries.sort((a, b) => b.score - a.score)
     const top = entries.slice(0, 10)
     try { localStorage.setItem(`lw-board-${sc.id}`, JSON.stringify(top)) } catch { /* storage unavailable */ }

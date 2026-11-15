@@ -871,3 +871,15 @@ input[type=text]:focus { border-color: var(--hud); box-shadow: inset 0 0 14px rg
 .fire-table td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 @media (max-width: 640px) { .src-table td:first-child, .src-table td:last-child { width: auto; } .fire-table th:nth-child(3), .fire-table td:nth-child(3) { display: none; } }
 .src-table { table-layout: fixed; } .src-table td:nth-child(2) { width: 50%; }
+
+/* =================== Difficulty =================== */
+.levels { display: grid; gap: 8px; }
+.level-card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; cursor: pointer; background: rgba(8, 14, 30, 0.75); border: 1px solid var(--line); clip-path: var(--chamfer); color: var(--text); position: relative; }
+.level-card b { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.08em; }
+.level-card .tiny { color: var(--muted); }
+.level-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 24px rgba(255, 181, 71, 0.12); }
+.lvl-cadet b { color: var(--good); } .lvl-engineer b { color: var(--warn); } .lvl-director b { color: var(--bad); }
+.level-mult { position: absolute; top: 8px; right: 10px; font-family: var(--display); font-size: 11px; color: var(--accent); }
+.growth-note { padding: 10px 12px; font-size: 13px; border-left: 3px solid var(--bad); background: rgba(255, 107, 90, 0.1); }
+.growth-note b { color: var(--bad); font-family: var(--display); letter-spacing: 0.04em; }
+.crew-silent { padding: 12px; font-family: var(--display); letter-spacing: 0.06em; font-size: 12px; color: var(--muted); text-align: center; border: 1px dashed var(--line-2); }

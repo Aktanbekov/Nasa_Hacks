@@ -102,6 +102,30 @@ export interface Objective {
   minRevisitPerDay?: number
   /** Special: met if the spacecraft survives the full planned lifetime. */
   survive?: boolean
+  /** Special (harder levels): alert fire crews within 3 h for at least this many replayed real fires. */
+  minFastAlerts?: number
+  /** Special (harder levels): fraction of all collected data that must reach the ground. */
+  minDelivered?: number
+}
+
+export type Difficulty = 'cadet' | 'engineer' | 'director'
+
+/** Rules that change with the difficulty level. */
+export interface LevelRules {
+  id: Difficulty
+  label: string
+  blurb: string
+  budgetFactor: number
+  /** Range of growth applied to mass, power and hardware cost at the first design review. */
+  growth: [number, number]
+  events: number
+  /** Multiplies damage and losses from risky event choices. */
+  eventHarm: number
+  autopilot: boolean
+  /** Multiplies the flight-math accuracy bands (smaller = stricter). */
+  burnTolerance: number
+  advisors: 'full' | 'vague' | 'none'
+  scoreMultiplier: number
 }
 
 export interface RealMission {
@@ -117,6 +141,8 @@ export interface RealMission {
 
 export interface Scenario {
   id: string
+  /** Difficulty rules this copy of the scenario was built for. */
+  level?: LevelRules
   name: string
   tagline: string
   objective: string
@@ -151,6 +177,8 @@ export interface Design {
   antennaId: string
   groundId: string
   storageId: string
+  /** Set at the first design review on harder levels: estimates firm up and grow. */
+  growth?: { mass: number; power: number; cost: number }
 }
 
 export type CheckStatus = 'pass' | 'warn' | 'fail'
@@ -294,6 +322,7 @@ export interface GameState {
   phase: Phase
   scenarioId: string | null
   relaxed: boolean
+  difficulty: Difficulty
   players: Record<string, Player>
   hostId: string
   design: Design | null

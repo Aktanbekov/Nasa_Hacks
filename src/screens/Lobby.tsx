@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { activePlayers, ROLE_NAMES, uncoveredRoles } from '../../shared/game.ts'
-import { COMING_SOON, SCENARIOS } from '../../shared/scenarios.ts'
+import { COMING_SOON, getScenario, LEVELS, SCENARIOS } from '../../shared/scenarios.ts'
+import type { Difficulty } from '../../shared/types.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
 import { InviteOverlay, InvitePanel } from '../invite.tsx'
 import { useLiveFires } from '../live.ts'
@@ -31,7 +32,8 @@ export function Lobby() {
           <p className="muted" style={{ margin: '4px 0 0' }}>Each brief has a budget, a deadline, must-have goals and bonus goals.</p>
         </div>
         <div className="scenarios">
-          {SCENARIOS.map((s) => {
+          {SCENARIOS.map((base) => {
+            const s = getScenario(base.id, state.difficulty)
             const sel = state.scenarioId === s.id
             return (
               <button key={s.id} className={`scenario ${sel ? 'sel' : ''}`} onClick={() => dispatch({ type: 'chooseScenario', scenarioId: s.id })} aria-pressed={sel}>
@@ -74,7 +76,7 @@ export function Lobby() {
         <div className="panel">
           <h3>{team ? 'Take a role' : 'Your roles'}</h3>
           {team && <p className="small muted" style={{ marginTop: 0 }}>Each role owns part of the spacecraft, and their goals conflict. With fewer than 4 players, someone takes two roles.</p>}
-          {!team && <p className="small muted" style={{ marginTop: 0 }}>Solo: you control everything. Advisors for each role will warn you when their part of the mission is in trouble.</p>}
+          {!team && <p className="small muted" style={{ marginTop: 0 }}>Solo: you control everything. {state.difficulty === 'cadet' ? 'Advisors for each role will tell you when their part of the mission is in trouble.' : state.difficulty === 'engineer' ? 'Advisors only warn that something is wrong, not what.' : 'No advisors at this level.'}</p>}
           <div className="roles">
             {ROLES.map((r) => {
               const holder = players.find((p) => p.roles.includes(r))
@@ -92,6 +94,16 @@ export function Lobby() {
           </div>
         </div>
         <div className="panel stack">
+          <h3 style={{ marginBottom: 0 }}>Difficulty</h3>
+          <div className="levels" role="radiogroup" aria-label="Difficulty">
+            {(Object.keys(LEVELS) as Difficulty[]).map((d) => (
+              <button key={d} role="radio" aria-checked={state.difficulty === d} className={`level-card ${state.difficulty === d ? 'on' : ''} lvl-${d}`} onClick={() => dispatch({ type: 'setDifficulty', difficulty: d })}>
+                <b>{LEVELS[d].label}</b>
+                <span className="tiny">{LEVELS[d].blurb}</span>
+                {LEVELS[d].scoreMultiplier > 1 && <span className="level-mult">×{LEVELS[d].scoreMultiplier} score</span>}
+              </button>
+            ))}
+          </div>
           <label className="toggle small">
             <input type="checkbox" checked={state.relaxed} onChange={(e) => dispatch({ type: 'setRelaxed', relaxed: e.target.checked })} />
             Relaxed mode: no design timer (good for classrooms and first plays)

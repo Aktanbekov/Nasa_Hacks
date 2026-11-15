@@ -48,19 +48,23 @@ export function computeMetrics(design: Design, scenario: Scenario, extraCostM = 
   const p = parts(design, scenario)
   const n = design.satellites
   const years = scenario.lifetimeYears
+  // Harder levels: estimates grow at the first design review (mass, power, hardware cost).
+  const gm = 1 + (design.growth?.mass ?? 0)
+  const gp = 1 + (design.growth?.power ?? 0)
+  const gc = 1 + (design.growth?.cost ?? 0)
 
   // ---- Mass ----
-  const payloadKg = p.instruments.reduce((s, i) => s + i.massKg, 0)
-  const massPerSatKg =
-    p.bus.massKg + payloadKg + p.solar.massKg + p.battery.massKg + p.adcs.massKg + p.prop.massKg +
-    p.antenna.massKg + p.storage.massKg + (design.redundancy ? REDUNDANCY.massKg : 0)
+  const payloadKg = p.instruments.reduce((s, i) => s + i.massKg, 0) * gm
+  const massPerSatKg = (
+    p.bus.massKg + p.instruments.reduce((s, i) => s + i.massKg, 0) + p.solar.massKg + p.battery.massKg + p.adcs.massKg + p.prop.massKg +
+    p.antenna.massKg + p.storage.massKg + (design.redundancy ? REDUNDANCY.massKg : 0)) * gm
   const launchMassKg = massPerSatKg * n
   const rocketCapacityKg = p.rocket.onlyOrbits && !p.rocket.onlyOrbits.includes(p.orbit.id) ? 0 : p.rocket.capacity[p.orbit.dest]
 
   // ---- Cost ----
-  const instCost = p.instruments.reduce((s, i) => s + i.costM, 0)
-  const busCost = p.bus.costM + p.solar.costM + p.battery.costM + p.adcs.costM + p.prop.costM + (design.redundancy ? REDUNDANCY.costM : 0)
-  const commsCost = p.antenna.costM + p.storage.costM
+  const instCost = p.instruments.reduce((s, i) => s + i.costM, 0) * gc
+  const busCost = (p.bus.costM + p.solar.costM + p.battery.costM + p.adcs.costM + p.prop.costM + (design.redundancy ? REDUNDANCY.costM : 0)) * gc
+  const commsCost = (p.antenna.costM + p.storage.costM) * gc
   const unit = instCost + busCost + commsCost
   const extraUnits = (n - 1) * unit * RULES.repeatUnitCost
   const groundCost = p.ground.costPerYearM * years
@@ -77,10 +81,10 @@ export function computeMetrics(design: Design, scenario: Scenario, extraCostM = 
   const costM = unit + extraUnits + p.rocket.costM + groundCost + opsCost + extraCostM
 
   // ---- Power ----
-  const instrumentLoadW = p.instruments.reduce((s, i) => s + i.powerW, 0)
-  const loadW =
-    p.bus.basePowerW + instrumentLoadW + (p.adcs.powerW ?? 0) + commsPowerW(design, scenario) +
-    (design.redundancy ? REDUNDANCY.powerW : 0)
+  const instrumentLoadW = p.instruments.reduce((s, i) => s + i.powerW, 0) * gp
+  const loadW = (
+    p.bus.basePowerW + p.instruments.reduce((s, i) => s + i.powerW, 0) + (p.adcs.powerW ?? 0) + commsPowerW(design, scenario) +
+    (design.redundancy ? REDUNDANCY.powerW : 0)) * gp
   const sunFrac = 1 - p.orbit.eclipseMin / p.orbit.periodMin
   const solarAvgW = p.solar.outputW * sunFrac * RULES.chargeEfficiency
   const powerMarginW = solarAvgW - loadW

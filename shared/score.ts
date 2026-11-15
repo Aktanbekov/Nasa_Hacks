@@ -34,6 +34,17 @@ export function objectiveStatus(sim: SimState | null, design: Design, scenario: 
       const met = !!sim && sim.day >= sim.plannedDays && sim.health > 0
       return { id: o.id, name: o.name, kind: o.kind, met, detail: met ? 'Survived the full mission.' : sim ? `Operated ${r1(sim.day / 365)} of ${scenario.lifetimeYears} years.` : 'Did not launch.' }
     }
+    if (o.minFastAlerts) {
+      const fast = (sim?.fires ?? []).filter((f) => f.alertHours !== null && f.alertHours <= 3).length
+      const done = !!sim && (sim.ended || sim.day >= sim.plannedDays)
+      const met = fast >= o.minFastAlerts
+      return { id: o.id, name: o.name, kind: o.kind, met, detail: `${fast} of ${o.minFastAlerts} needed fires alerted within 3 hours${done || met ? '' : ' so far'}.` }
+    }
+    if (o.minDelivered) {
+      const frac = sim && sim.generatedGB > 0 ? (sim.downlinkedGB) / sim.generatedGB : 0
+      const met = !!sim && sim.generatedGB > 0 && frac >= o.minDelivered
+      return { id: o.id, name: o.name, kind: o.kind, met, detail: `${Math.round(frac * 100)}% of data delivered (needs ${Math.round(o.minDelivered * 100)}%).` }
+    }
     const pts = p.instruments.reduce((s, i) => s + (sci[i.id] ?? 0) * (i.objectives[o.id] ?? 0), 0)
     const revisitOk = !o.minRevisitPerDay || m.revisitPerDay >= o.minRevisitPerDay
     const met = pts >= o.threshold && revisitOk && (o.threshold > 0 || pts > 0)
@@ -121,6 +132,11 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
         ...(calcRow ? [calcRow] : []),
         ...(fireRow ? [fireRow] : []),
       ]
+  const level = scenario.level
+  if (level && level.scoreMultiplier > 1) {
+    const base = breakdown.reduce((s, b) => s + b.points, 0)
+    breakdown.push({ label: `${level.label} difficulty bonus`, points: Math.round(base * (level.scoreMultiplier - 1)), detail: `×${level.scoreMultiplier} for playing on ${level.label}.` })
+  }
   const score = breakdown.reduce((s, b) => s + b.points, 0)
 
   // ---- Tier ----

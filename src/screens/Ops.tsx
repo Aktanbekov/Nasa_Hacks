@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { computeMetrics, parts, r1 } from '../../shared/calc.ts'
 import { activePlayers, ownsRole } from '../../shared/game.ts'
-import { getScenario } from '../../shared/scenarios.ts'
+import { scenarioOf } from '../../shared/scenarios.ts'
 import { objectiveStatus } from '../../shared/score.ts'
 import type { SimPoint } from '../../shared/types.ts'
 import { GraphicsToggle, OrbitView } from '../scene3d.tsx'
@@ -47,7 +47,7 @@ function Chart({ data, series, xMax, yMax, unit, height = 180 }: { data: SimPoin
 
 export function Ops() {
   const { state, dispatch } = useCtx()
-  const sc = getScenario(state.scenarioId!)
+  const sc = scenarioOf(state)
   const design = state.design!
   const sim = state.sim!
   const p = parts(design, sc)

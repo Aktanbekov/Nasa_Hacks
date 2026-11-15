@@ -3,11 +3,11 @@
 import { ROCKETS, RULES, byId } from './catalog.ts'
 import { canLaunch, computeMetrics, describeChange } from './calc.ts'
 import { hashRand, newSeed } from './rng.ts'
-import { getScenario } from './scenarios.ts'
+import { scenarioOf } from './scenarios.ts'
 import { buildReport } from './score.ts'
 import { applyCalc, buildChallenge, gradeCalc } from './flightcalc.ts'
 import { initSim, resolveEvent, stepDay } from './sim.ts'
-import type { Design, FeedItem, GameState, Role } from './types.ts'
+import type { Design, Difficulty, FeedItem, GameState, Role, Scenario } from './types.ts'
 import { ROLES } from './types.ts'
 
 export const ROLE_NAMES: Record<Role, string> = {
@@ -16,7 +16,7 @@ export const ROLE_NAMES: Record<Role, string> = {
 export const ROLE_SHORT: Record<Role, string> = { lead: 'Lead', science: 'Science', engineer: 'Engineer', comms: 'Comms' }
 
 /** Which role owns which design field. */
-export const FIELD_OWNER: Record<keyof Design, Role> = {
+export const FIELD_OWNER: Record<Exclude<keyof Design, 'growth'>, Role> = {
   orbitId: 'lead', rocketId: 'lead', satellites: 'lead',
   instruments: 'science',
   busId: 'engineer', solarId: 'engineer', batteryId: 'engineer', adcsId: 'engineer', propulsionId: 'engineer', redundancy: 'engineer',
@@ -34,6 +34,7 @@ export type Action =
   | { type: 'claimRole'; playerId: string; role: Role }
   | { type: 'chooseScenario'; playerId: string; scenarioId: string }
   | { type: 'setRelaxed'; relaxed: boolean }
+  | { type: 'setDifficulty'; difficulty: Difficulty }
   | { type: 'startDesign'; playerId: string }
   | { type: 'ready'; playerId: string; value: boolean }
   | { type: 'setDesign'; playerId: string; patch: Partial<Design> }
@@ -54,7 +55,7 @@ export type Action =
 
 export function createGame(code: string, mode: 'solo' | 'team', now: number): GameState {
   return {
-    code, mode, phase: 'lobby', scenarioId: null, relaxed: false, players: {}, hostId: '',
+    code, mode, phase: 'lobby', scenarioId: null, relaxed: false, difficulty: 'cadet', players: {}, hostId: '',
     design: null, designStartedAt: 0, overtimeM: 0, opsAcc: 0, feed: [], feedSeq: 0, approvals: {}, ready: {}, calc: null, reviewAttempts: 0,
     launch: null, sim: null, pendingEvent: null, votes: {}, speed: 1, paused: false, report: null,
     seed: newSeed(), flight: 1, rev: 0, now,
@@ -77,13 +78,13 @@ export const uncoveredRoles = (s: GameState) => ROLES.filter((r) => !activePlaye
 /** Minutes over the design timer, priced as "standing army" cost. */
 export function overtimeCost(s: GameState, now: number) {
   if (s.relaxed || !s.scenarioId || !s.designStartedAt) return 0
-  const sc = getScenario(s.scenarioId)
+  const sc = scenarioOf(s)
   const over = (now - s.designStartedAt) / 60000 - sc.designMinutes
   return over > 0 ? Math.ceil(over) * RULES.overtimeCostPerMin : 0
 }
 
 function startDesign(s: GameState, now: number) {
-  const sc = getScenario(s.scenarioId!)
+  const sc = scenarioOf(s)
   if (!s.design) s.design = structuredClone(sc.starter)
   s.phase = 'design'
   s.designStartedAt = now
@@ -95,6 +96,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
   s.now = now
   if (!s.ready) s.ready = {} // rooms saved before the briefing phase existed
   if (s.calc === undefined) s.calc = null
+  if (!s.difficulty) s.difficulty = 'cadet'
   switch (a.type) {
     case 'join': {
       const existing = s.players[a.playerId]
@@ -131,6 +133,10 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
     case 'setRelaxed':
       s.relaxed = a.relaxed
       break
+    case 'setDifficulty':
+      if (s.phase !== 'lobby' || !['cadet', 'engineer', 'director'].includes(a.difficulty)) break
+      s.difficulty = a.difficulty
+      break
     case 'startDesign':
       // Lobby -> story briefing. The design timer starts only when everyone is ready.
       if (s.phase !== 'lobby' || !s.scenarioId) break
@@ -148,7 +154,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
     case 'setDesign':
     case 'toggleInstrument': {
       if (s.phase !== 'design' || !s.design || !s.scenarioId) break
-      const sc = getScenario(s.scenarioId)
+      const sc = scenarioOf(s)
       const before = computeMetrics(s.design, sc)
       const next: Design = { ...s.design, instruments: [...s.design.instruments] }
       let role: Role
@@ -162,8 +168,8 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
         next.instruments = had ? next.instruments.filter((x) => x !== inst.id) : [...next.instruments, inst.id]
         what = `${had ? 'removed' : 'added'} the ${inst.name.toLowerCase()}`
       } else {
-        const keys = Object.keys(a.patch) as (keyof Design)[]
-        if (!keys.length) break
+        const keys = Object.keys(a.patch) as Exclude<keyof Design, 'growth'>[]
+        if (!keys.length || keys.some((k) => !(k in FIELD_OWNER))) break // e.g. growth can't be edited
         role = FIELD_OWNER[keys[0]]
         if (!keys.every((k) => ownsRole(s, a.playerId, FIELD_OWNER[k]))) break
         Object.assign(next, a.patch)
@@ -192,13 +198,23 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       push(s, { role: p?.roles[0], who: p?.name, text, tone: 'info' })
       break
     }
-    case 'goReview':
-      if (s.phase !== 'design') break
+    case 'goReview': {
+      if (s.phase !== 'design' || !s.design) break
       s.phase = 'review'
       s.reviewAttempts += 1
       s.approvals = {}
       push(s, { role: 'system', text: `${playerName(s, a.playerId)} called the design review.`, tone: 'info' })
+      // Harder levels: at the first review the estimates firm up, and they always grow.
+      const lv = scenarioOf(s).level
+      if (lv && lv.growth[1] > 0 && !s.design.growth) {
+        const roll = (k: string) => lv.growth[0] + hashRand(s.seed, 'growth', k, s.flight) * (lv.growth[1] - lv.growth[0])
+        s.design = { ...s.design, growth: { mass: roll('mass'), power: roll('power'), cost: roll('cost') } }
+        const g = s.design.growth!
+        const pct = (x: number) => `+${Math.round(x * 100)}%`
+        push(s, { role: 'system', text: `Preliminary design review: the estimates firmed up. Mass ${pct(g.mass)}, power ${pct(g.power)}, hardware cost ${pct(g.cost)}. Real projects always grow, which is why engineers keep margins.`, tone: 'bad' })
+      }
       break
+    }
     case 'backToDesign':
       if (s.phase !== 'review') break
       s.phase = 'design'
@@ -211,7 +227,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       break
     case 'launch': {
       if (s.phase !== 'review' || !s.design || !s.scenarioId || !isLead(s, a.playerId)) break
-      const sc = getScenario(s.scenarioId)
+      const sc = scenarioOf(s)
       if (!canLaunch(computeMetrics(s.design, sc))) break
       if (s.mode === 'team' && !activePlayers(s).every((p) => s.approvals[p.id])) break
       // Review passed: program the flight computer before liftoff.
@@ -224,7 +240,9 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
     case 'submitCalc': {
       if (s.phase !== 'calc' || !s.calc || s.calc.result) break
       const by = s.players[a.playerId]?.name ?? 'The team'
-      s.calc.result = gradeCalc(s.calc.challenge, a.twr, a.burn, a.autopilot, by)
+      const lvl = scenarioOf(s).level
+      if (a.autopilot && lvl && !lvl.autopilot) break
+      s.calc.result = gradeCalc(s.calc.challenge, a.twr, a.burn, a.autopilot, by, lvl?.burnTolerance ?? 1)
       const r = s.calc.result
       push(s, { role: 'system', who: s.mode === 'team' ? by : undefined, text: r.grade === 'autopilot' ? 'Flight computer set to autopilot.' : `Burn programmed: ${Math.round(r.burnAnswer ?? 0)} s. ${r.verdict}`, tone: r.grade === 'bullseye' || r.grade === 'good' ? 'good' : r.grade === 'autopilot' ? 'info' : 'bad' })
       break
@@ -256,7 +274,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
         choice = top.length === 1 ? top[0] : (leadVote && top.includes(s.votes[leadVote.id]) ? s.votes[leadVote.id] : top[0])
       }
       if (choice) {
-        const sc = getScenario(s.scenarioId)
+        const sc = scenarioOf(s)
         const label = ev.options.find((o) => o.id === choice)?.label ?? choice
         const res = resolveEvent(ev, choice, s.sim, s.design, sc, s.seed)
         push(s, { role: 'system', text: `Day ${s.sim.day} · ${ev.title}: team chose "${label}". ${res.text}`, tone: res.tone })
@@ -304,7 +322,7 @@ function describePatch(patch: Partial<Design>, _sc: string): string {
   return labels[k] ?? 'changed the design'
 }
 
-function finish(s: GameState, sc: ReturnType<typeof getScenario>) {
+function finish(s: GameState, sc: Scenario) {
   s.report = buildReport(s, sc)
   s.phase = 'report'
   s.pendingEvent = null
@@ -314,7 +332,7 @@ function finish(s: GameState, sc: ReturnType<typeof getScenario>) {
 export function tick(s: GameState, now: number, dtMs: number): boolean {
   s.now = now
   if (s.phase === 'launch' && s.launch && now - s.launch.at >= LAUNCH_ANIMATION_MS) {
-    const sc = getScenario(s.scenarioId!)
+    const sc = scenarioOf(s)
     if (!s.launch.success) {
       push(s, { role: 'system', text: 'Launch failure. The rocket did not reach orbit.', tone: 'bad' })
       finish(s, sc)
@@ -329,7 +347,7 @@ export function tick(s: GameState, now: number, dtMs: number): boolean {
     return true
   }
   if (s.phase === 'ops' && s.sim && !s.pendingEvent && !s.paused) {
-    const sc = getScenario(s.scenarioId!)
+    const sc = scenarioOf(s)
     const daysPerMs = s.sim.plannedDays / (OPS_SECONDS * 1000)
     s.opsAcc += daysPerMs * dtMs * s.speed
     let steps = Math.floor(s.opsAcc)

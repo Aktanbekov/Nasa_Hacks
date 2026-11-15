@@ -99,7 +99,7 @@ export function evalExpr(input: string): number | null {
   } catch { return null }
 }
 
-export function gradeCalc(ch: CalcChallenge, twrAnswer: number | null, burnAnswer: number | null, autopilot: boolean, by: string): CalcResult {
+export function gradeCalc(ch: CalcChallenge, twrAnswer: number | null, burnAnswer: number | null, autopilot: boolean, by: string, tolerance = 1): CalcResult {
   const twrOk = twrAnswer !== null && Math.abs(twrAnswer - ch.twr.answer) <= Math.max(0.05, ch.twr.answer * 0.04)
   if (autopilot || burnAnswer === null || burnAnswer <= 0) {
     return {
@@ -110,7 +110,7 @@ export function gradeCalc(ch: CalcChallenge, twrAnswer: number | null, burnAnswe
   }
   const ratio = burnAnswer / ch.burn.answer
   const err = Math.abs(ratio - 1)
-  const grade: Grade = err <= 0.03 ? 'bullseye' : err <= 0.1 ? 'good' : err <= 0.25 ? 'off' : 'wayoff'
+  const grade: Grade = err <= 0.03 * tolerance ? 'bullseye' : err <= 0.1 * tolerance ? 'good' : err <= 0.25 * tolerance ? 'off' : 'wayoff'
   const under = ratio < 1
   const pct = Math.round(err * 100)
   const capture = ch.burn.kind === 'capture'

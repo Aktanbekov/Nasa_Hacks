@@ -12,18 +12,19 @@ export function initSim(design: Design, scenario: Scenario, seed: number): SimSt
   const instrumentState: SimState['instrumentState'] = {}
   for (const i of p.instruments) instrumentState[i.id] = { on: true, quality: 1, activeDays: 0, generatedGB: 0 }
 
-  // Pick up to 4 events in a seeded order, spread across the mission.
-  const pool = scenario.events
+  // Pick events in a seeded order, spread across the mission (harder levels get more).
+  const count = scenario.level?.events ?? 4
+  const shuffled = scenario.events
     .filter((e) => e !== 'instrument-glitch' || p.instruments.length > 0)
     .map((e) => ({ e, r: hashRand(seed, 'event-order', e) }))
     .sort((a, b) => a.r - b.r)
-    .slice(0, 4)
     .map((x) => x.e)
-  const slots = [0.1, 0.33, 0.56, 0.78]
+  const pool = Array.from({ length: Math.min(count, shuffled.length * 2) }, (_, k) => shuffled[k % shuffled.length])
+  const gap = 0.84 / pool.length
   const eventSchedule = pool.map((templateId, k) => {
-    const day = Math.round(plannedDays * (slots[k] + hashRand(seed, 'event-day', k) * 0.12))
+    const day = Math.round(plannedDays * (0.08 + k * gap + hashRand(seed, 'event-day', k) * gap * 0.5))
     const instrumentId = templateId === 'instrument-glitch'
-      ? p.instruments[Math.floor(hashRand(seed, 'glitch-inst') * p.instruments.length)].id
+      ? p.instruments[Math.floor(hashRand(seed, 'glitch-inst', k) * p.instruments.length)].id
       : undefined
     return { day, templateId, instrumentId }
   })
@@ -55,7 +56,7 @@ export function stepDay(sim: SimState, design: Design, scenario: Scenario, seed:
   // Aging: solar cells degrade with radiation; batteries wear faster when drained deeply.
   sim.solarHealth = Math.pow(1 - p.orbit.solarDegradation, day / 365)
   const onInst = p.instruments.filter((i) => sim.instrumentState[i.id]?.on)
-  const instLoad = onInst.reduce((s, i) => s + i.powerW, 0)
+  const instLoad = onInst.reduce((s, i) => s + i.powerW, 0) * (1 + (design.growth?.power ?? 0))
   const busLoad = m.loadW - m.instrumentLoadW
   const eclipseHr = p.orbit.eclipseMin / 60
   const solar = m.solarAvgW * sim.solarHealth
@@ -209,10 +210,11 @@ export function buildEvent(templateId: string, sim: SimState, design: Design, sc
     case 'budget-cut': {
       const reserve = scenario.budgetM - m.costM - sim.extraCostM
       const disabled: Record<string, string> = {}
-      if (reserve < 6) disabled.reserve = `Only $${Math.max(0, Math.round(reserve * 10) / 10)}M left in reserve`
+      const cut = Math.round(6 * (scenario.level?.eventHarm ?? 1))
+      if (reserve < cut) disabled.reserve = `Only $${Math.max(0, Math.round(reserve * 10) / 10)}M left in reserve`
       return {
         ...base, disabled, title: 'Budget cut',
-        body: 'The agency cut $6M from operations. Something has to give.',
+        body: `The agency cut $${cut}M from operations. Something has to give.`,
         options: [
           { id: 'reserve', label: 'Cover it from our reserve', detail: 'Uses unspent budget. No impact on the mission.' },
           { id: 'contact', label: 'Halve ground station time', detail: 'Saves the money, but downlink drops 50% for the rest of the mission.' },
@@ -269,12 +271,14 @@ export function resolveEvent(ev: PendingEvent, optionId: string, sim: SimState, 
   const m = computeMetrics(design, scenario)
   const roll = hashRand(seed, 'resolve', ev.id, optionId)
   const red = design.redundancy
+  const H = scenario.level?.eventHarm ?? 1
+  const hurt = (n: number) => Math.round(n * H)
   let out: { text: string; tone: 'good' | 'bad' | 'info'; quality: number }
   switch (ev.templateId) {
     case 'solar-storm':
       if (optionId === 'safe') { sim.safeModeDaysLeft = 4; out = { text: 'Safe mode held. The storm passed without damage; 4 days of science paused.', tone: 'good', quality: 1 } }
       else if (roll < 0.55) {
-        const dmg = red ? 12 : 30
+        const dmg = hurt(red ? 12 : 30)
         sim.health -= dmg
         sim.solarHealth *= 0.97
         out = { text: `The storm hit hard: electronics damaged (health −${dmg}%)${red ? '. The backup computer took over.' : '.'}`, tone: 'bad', quality: 0.2 }
@@ -292,7 +296,7 @@ export function resolveEvent(ev: PendingEvent, optionId: string, sim: SimState, 
       break
     }
     case 'budget-cut':
-      if (optionId === 'reserve') { sim.extraCostM += 6; out = { text: 'Covered the cut from reserve. Good thing we kept some.', tone: 'good', quality: 1 } }
+      if (optionId === 'reserve') { sim.extraCostM += hurt(6); out = { text: 'Covered the cut from reserve. Good thing we kept some.', tone: 'good', quality: 1 } }
       else if (optionId === 'contact') {
         sim.contactFactor = 0.5
         const short = m.downlinkGBPerDay * 0.5 * RULES.realWorldDownlink < m.dataGBPerDay
@@ -310,7 +314,7 @@ export function resolveEvent(ev: PendingEvent, optionId: string, sim: SimState, 
       break
     case 'debris':
       if (optionId === 'dodge') { sim.fuelDv = Math.max(0, sim.fuelDv - 2); out = { text: 'Burn complete. The debris passed 3 km away.', tone: 'good', quality: 1 } }
-      else if (roll < 0.125) { sim.health -= 60; out = { text: 'Impact! A fragment punched through a solar panel (health −60%).', tone: 'bad', quality: 0.2 } }
+      else if (roll < 0.125) { sim.health -= hurt(60); out = { text: `Impact! A fragment punched through a solar panel (health −${hurt(60)}%).`, tone: 'bad', quality: 0.2 } }
       else out = { text: 'The debris missed. Phew.', tone: 'info', quality: ev.disabled.dodge ? 0.6 : 0.4 }
       break
     case 'lunar-eclipse': {
@@ -318,11 +322,11 @@ export function resolveEvent(ev: PendingEvent, optionId: string, sim: SimState, 
       const busLoad = m.loadW - m.instrumentLoadW
       if (optionId === 'powerdown') {
         sim.safeModeDaysLeft = Math.max(sim.safeModeDaysLeft, 1)
-        if (busLoad * 3 > battWh) { sim.health -= 20; out = { text: 'Even the core systems drained the battery. Some hardware got too cold (health −20%).', tone: 'bad', quality: 0.8 } }
+        if (busLoad * 3 > battWh) { sim.health -= hurt(20); out = { text: `Even the core systems drained the battery. Some hardware got too cold (health −${hurt(20)}%).`, tone: 'bad', quality: 0.8 } }
         else out = { text: 'Powered down and rode out the eclipse safely.', tone: 'good', quality: 1 }
       } else if (m.loadW * 3 > battWh) {
-        sim.health -= 45; sim.batteryHealth *= 0.85
-        out = { text: 'The battery ran flat in the dark. Brownout damaged the spacecraft (health −45%).', tone: 'bad', quality: 0.1 }
+        sim.health -= hurt(45); sim.batteryHealth *= 0.85
+        out = { text: `The battery ran flat in the dark. Brownout damaged the spacecraft (health −${hurt(45)}%).`, tone: 'bad', quality: 0.1 }
       } else out = { text: 'Our big battery carried everything through the eclipse.', tone: 'good', quality: 0.9 }
       break
     }
