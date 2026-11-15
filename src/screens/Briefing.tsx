@@ -4,6 +4,7 @@ import { activePlayers, ROLE_NAMES } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
 import { CHARACTERS, STORIES, type SceneId } from '../story.ts'
+import { useLiveFires } from '../live.ts'
 import { Portrait, StoryScene } from '../storyArt.tsx'
 import { Avatar, ROLE_COLOR, useCtx } from '../ui.tsx'
 
@@ -100,6 +101,7 @@ function GoalCard({ onNext, onBack }: { onNext: () => void; onBack: () => void }
       <div className="brief-kicker">Your mission</div>
       <h1>{sc.name}</h1>
       <p className="brief-lede">{sc.objective}</p>
+      {sc.id === 'wildfire' && <LiveFireNote />}
       <div className="brief-facts">
         <div><b>{fmtM(sc.budgetM)}</b><span>total budget</span></div>
         <div><b>{sc.lifetimeYears} years</b><span>in operation</span></div>
@@ -177,5 +179,16 @@ function HowTo({ onBack }: { onBack: () => void }) {
         </button>
       </div>
     </section>
+  )
+}
+
+function LiveFireNote() {
+  const live = useLiveFires()
+  return (
+    <div className="real-data-note">
+      <b>Real data:</b> during your mission, 8 real California wildfires (2018–2025, from national fire records) will ignite where and when they really started.
+      You'll see how many hours your design would have taken to alert fire crews.
+      {live && <> Right now NASA satellites see <b className="warn">{live.count.toLocaleString()} fire detections</b> in California ({live.window === '24h' ? 'last 24 h' : 'last 7 days'}). They appear as orange dots on your orbit view.</>}
+    </div>
   )
 }

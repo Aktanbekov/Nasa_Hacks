@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { ADCS, ANTENNAS, BUSES, NETWORKS, ORBITS, PROPULSION, ROCKETS, SOLAR, STORAGE, byId } from '../shared/catalog.ts'
 import { fmtM, r1 } from '../shared/calc.ts'
 import type { Design, Metrics, Scenario, SimState } from '../shared/types.ts'
+import { WILDFIRES } from '../shared/wildfires.ts'
 import { AdcsIcon, AntennaIcon, Box, C, InstrumentIcon, MiniEarth, PropIcon, RocketShape, StorageIcon } from './art.tsx'
 import { INSTRUMENT_COLORS } from './ui.tsx'
 
@@ -294,6 +295,8 @@ export interface Live {
   health: number
   ended: boolean
   powerShort: boolean
+  /** Real fires replayed so far; `recent` ones pulse on the globe. */
+  fires: { lat: number; lon: number; name: string; recent: boolean }[]
 }
 
 export function liveFrom(sim: SimState, pendingEvent: string | null): Live {
@@ -304,6 +307,7 @@ export function liveFrom(sim: SimState, pendingEvent: string | null): Live {
     health: sim.health,
     ended: sim.ended,
     powerShort: (sim.history.at(-1)?.powerOk ?? 1) < 0.99,
+    fires: (sim.fires ?? []).map((f) => ({ lat: WILDFIRES[f.fireIndex].lat, lon: WILDFIRES[f.fireIndex].lon, name: WILDFIRES[f.fireIndex].name, recent: sim.day - f.day < 40 })),
   }
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createRoom, type Session } from '../transport.ts'
 import { Logo } from '../ui.tsx'
 
-export function Home({ name, setName, onStart }: { name: string; setName: (n: string) => void; onStart: (s: Session) => void }) {
+export function Home({ name, setName, onStart, onSources }: { name: string; setName: (n: string) => void; onStart: (s: Session) => void; onSources: () => void }) {
   const [code, setCode] = useState(() => new URLSearchParams(location.search).get('room') ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -58,6 +58,7 @@ export function Home({ name, setName, onStart }: { name: string; setName: (n: st
           <div><b>3 · Review & launch</b>Pass the checks, light the rocket</div>
           <div><b>4 · Fly & learn</b>Survive events, read the report</div>
         </div>
+        <button className="link-btn" style={{ marginTop: 16 }} onClick={onSources}>Science & sources: real NASA data and where every number comes from →</button>
       </section>
       <section className="card" aria-label="Start a game">
         <label className="stack" style={{ gap: 6 }}>

@@ -3,6 +3,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { ANTENNAS, BUSES, PROPULSION, SOLAR, byId } from '../shared/catalog.ts'
 import { ROLE_NAMES, ROLE_SHORT } from '../shared/game.ts'
 import type { Design, GameState, Phase, Role } from '../shared/types.ts'
+import { BASIS, sourceById } from '../shared/sources.ts'
 import { GLOSSARY } from './glossary.ts'
 import type { Dispatch } from './transport.ts'
 
@@ -55,9 +56,22 @@ export function Stat({ k, v }: { k: string; v: ReactNode }) {
   return <span className="stat">{k} <b>{v}</b></span>
 }
 
-export function OptionCard({ selected, locked, onClick, name, blurb, stats, note, multi, disabled, children, art }: {
+/** "Real-world basis" tooltip for a catalog item. */
+export function BasisTip({ id }: { id: string }) {
+  const b = BASIS[id]
+  if (!b) return null
+  const names = b.sources.map((s) => sourceById(s)?.title).filter(Boolean)
+  return (
+    <span className="term basis" tabIndex={0} onClick={(e) => e.stopPropagation()}>
+      ⓘ Real-world basis
+      <span className="pop" role="tooltip"><b>Based on</b>{b.note}{names.length ? <em> Sources: {names.join('; ')}.</em> : <em> Game value.</em>}</span>
+    </span>
+  )
+}
+
+export function OptionCard({ selected, locked, onClick, name, blurb, stats, note, multi, disabled, children, art, basis }: {
   selected: boolean; locked: boolean; onClick: () => void; name: string; blurb: string
-  stats?: ReactNode; note?: ReactNode; multi?: boolean; disabled?: boolean; children?: ReactNode; art?: ReactNode
+  stats?: ReactNode; note?: ReactNode; multi?: boolean; disabled?: boolean; children?: ReactNode; art?: ReactNode; basis?: string
 }) {
   return (
     <button
@@ -74,6 +88,7 @@ export function OptionCard({ selected, locked, onClick, name, blurb, stats, note
         {stats && <span className="stats">{stats}</span>}
         {children}
         {note && <span className="note">{note}</span>}
+        {basis && <BasisTip id={basis} />}
       </span>
     </button>
   )

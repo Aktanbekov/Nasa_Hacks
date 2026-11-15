@@ -65,7 +65,7 @@ export const ROCKETS: Rocket[] = [
   {
     id: 'rideshare', name: 'Rideshare slot',
     blurb: 'Share a big rocket with dozens of other satellites. Very cheap and reliable, but you go where they go: 600 km sun-synchronous only.',
-    massKg: 0, costM: 3, reliability: 0.98,
+    massKg: 0, costM: 1.5, reliability: 0.98,
     capacity: { leo: 0, sso: 180, geo: 0, moon: 0 }, onlyOrbits: ['sso-600'],
   },
   {
@@ -146,7 +146,7 @@ export const PROPULSION: Propulsion[] = [
 ]
 
 export const ANTENNAS: Antenna[] = [
-  { id: 'ant-uhf', name: 'UHF radio', blurb: 'Like a walkie-talkie. Tiny data rate.', massKg: 1, costM: 0.4, powerW: 6, rateMbps: { earth: 0.1, geo: 0.01, moon: 0 } },
+  { id: 'ant-uhf', name: 'UHF radio', blurb: 'Like a walkie-talkie. Tiny data rate.', massKg: 1, costM: 0.4, powerW: 6, rateMbps: { earth: 0.038, geo: 0.004, moon: 0 } },
   { id: 'ant-s', name: 'S-band patch', blurb: 'Reliable, low-rate link. Fine for small data loads.', massKg: 2, costM: 1.5, powerW: 15, rateMbps: { earth: 4, geo: 1, moon: 0.1 } },
   { id: 'ant-x', name: 'X-band antenna', blurb: 'The standard science downlink. Fast near Earth.', massKg: 5, costM: 4, powerW: 30, rateMbps: { earth: 150, geo: 25, moon: 2 } },
   { id: 'ant-ka', name: 'Ka-band high-gain dish', blurb: 'A pointed dish with a very fast link. Needed for lots of data from far away.', massKg: 16, costM: 11, powerW: 55, rateMbps: { earth: 500, geo: 150, moon: 40 } },

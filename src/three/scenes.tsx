@@ -3,10 +3,12 @@
 import { Environment, Lightformer, Line, OrbitControls, Stars } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { ANTENNAS, BUSES, NETWORKS, ORBITS, SOLAR, byId } from '../../shared/catalog.ts'
 import type { Design, Scenario } from '../../shared/types.ts'
+import type { Hotspot } from '../../shared/wildfires.ts'
+import { useLiveFires } from '../live.ts'
 import type { Live } from '../stages.tsx'
 import { CraftModel, Earth, instrumentColor, Moon, RocketModel, rocketHeight } from './models.tsx'
 import { groundTexture, latLonToVec3, softDotTexture } from './textures.ts'
@@ -361,6 +363,31 @@ function Debris({ active, o }: { active: boolean; o: OrbitDef }) {
   return <mesh ref={ref}><dodecahedronGeometry args={[0.05, 0]} /><meshStandardMaterial color="#8a93a8" roughness={0.8} metalness={0.5} /></mesh>
 }
 
+/** Live NASA FIRMS detections as tiny glowing points on the globe. */
+function HotspotLayer({ hotspots, radius }: { hotspots: Hotspot[]; radius: number }) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const n = Math.min(hotspots.length, 400)
+  useEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    const m = new THREE.Matrix4()
+    hotspots.slice(0, n).forEach((h, i) => {
+      const p = latLonToVec3(h.lat, h.lon, radius * 1.004)
+      const s = 0.6 + Math.min(1.6, h.frp / 120)
+      m.makeScale(s, s, s).setPosition(p)
+      mesh.setMatrixAt(i, m)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+  }, [hotspots, n, radius])
+  if (!n) return null
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, n]}>
+      <sphereGeometry args={[0.009, 6, 6]} />
+      <meshBasicMaterial color="#ffb347" toneMapped={false} />
+    </instancedMesh>
+  )
+}
+
 export function Orbit3D({ design, sc, live }: { design: Design; sc: Scenario; live?: Live }) {
   const orbit = byId(ORBITS, design.orbitId)
   const o = ORBIT3D[orbit.id] ?? ORBIT3D['sso-600']
@@ -375,6 +402,7 @@ export function Orbit3D({ design, sc, live }: { design: Design; sc: Scenario; li
   const sunScale = live?.event === 'lunar-eclipse' ? 0.12 : 1
   const stations = moon ? [] : STATIONS[ground.id] ?? []
   const target = moon ? { lat: -88, lon: 0, color: '#bfe8ff' } : { lat: 37, lon: -120, color: '#ff7a45' }
+  const liveFires = useLiveFires(sc.id === 'wildfire')
 
   return (
     <Shell camera={{ position: o.cam, fov: 42 }} controls={{ min: 3.2, max: 30 }} bloom={1.1}>
@@ -396,6 +424,10 @@ export function Orbit3D({ design, sc, live }: { design: Design; sc: Scenario; li
       ) : (
         <Earth radius={R} spin={EARTH_SPIN}>
           <SurfacePin lat={target.lat} lon={target.lon} radius={R}><group ref={targetRef}><Marker color={target.color} /></group></SurfacePin>
+          {liveFires && <HotspotLayer hotspots={liveFires.hotspots} radius={R} />}
+          {(live?.fires ?? []).map((f) => (
+            <SurfacePin key={f.name} lat={f.lat} lon={f.lon} radius={R}><Marker color="#ff3b1f" pulse={f.recent} size={f.recent ? 0.05 : 0.028} /></SurfacePin>
+          ))}
           {stations.map(([la, lo], i) => (
             <SurfacePin key={`${la}${lo}`} lat={la} lon={lo} radius={R}>
               <group ref={(el) => { stationRefs.current[i] = el }}><Marker color={live?.outage ? '#ff6b5a' : '#e9edf6'} pulse={false} size={0.035} /></group>

@@ -126,9 +126,54 @@ function moon(W: number, H: number) {
   return { day }
 }
 
-self.onmessage = (e: MessageEvent<{ kind: 'earth' | 'moon'; w: number; h: number }>) => {
-  const { kind, w, h } = e.data
+/** Decode an image URL into RGBA pixels (needs OffscreenCanvas). */
+async function pixels(url: string) {
+  const blob = await (await fetch(url)).blob()
+  const bmp = await createImageBitmap(blob)
+  const c = new OffscreenCanvas(bmp.width, bmp.height)
+  const ctx = c.getContext('2d')!
+  ctx.drawImage(bmp, 0, 0)
+  return { w: bmp.width, h: bmp.height, data: ctx.getImageData(0, 0, bmp.width, bmp.height).data }
+}
+
+/**
+ * NASA Blue Marble (SVS 3615): the clear-sky map is the surface; subtracting it
+ * from the cloudy map gives a real cloud layer. Oceans (blue-dominant pixels)
+ * get low roughness so sunlight glints off them.
+ */
+async function earthNasa(dayUrl: string, cloudUrl: string) {
+  const day = await pixels(dayUrl)
+  const cl = await pixels(cloudUrl)
+  const n = day.w * day.h
+  const rough = new Uint8ClampedArray(n * 4)
+  const clouds = new Uint8ClampedArray(n * 4)
+  for (let i = 0; i < n; i++) {
+    const o = i * 4
+    const r = day.data[o], g = day.data[o + 1], b = day.data[o + 2]
+    const ocean = b > r + 18 && b > g + 4
+    const rv = ocean ? 120 : 235
+    rough[o] = rv; rough[o + 1] = rv; rough[o + 2] = rv; rough[o + 3] = 255
+    const lumD = 0.3 * r + 0.59 * g + 0.11 * b
+    const lumC = 0.3 * cl.data[o] + 0.59 * cl.data[o + 1] + 0.11 * cl.data[o + 2]
+    const a = Math.max(0, Math.min(255, (lumC - lumD - 6) * 2.6))
+    clouds[o] = 255; clouds[o + 1] = 255; clouds[o + 2] = 255; clouds[o + 3] = a
+  }
+  return { w: day.w, h: day.h, layers: { day: day.data, rough, clouds } }
+}
+
+self.onmessage = async (e: MessageEvent<{ kind: 'earth' | 'moon' | 'earth-nasa'; w: number; h: number; urls?: string[] }>) => {
+  const { kind, w, h, urls } = e.data
+  if (kind === 'earth-nasa') {
+    try {
+      const r = await earthNasa(urls![0], urls![1])
+      const buffers = Object.values(r.layers).map((a) => a.buffer as ArrayBuffer)
+      ;(self as unknown as Worker).postMessage({ ...r, kind, w, ok: true }, buffers)
+    } catch (err) {
+      ;(self as unknown as Worker).postMessage({ kind, w, h, ok: false, error: String(err) })
+    }
+    return
+  }
   const layers = kind === 'earth' ? earth(w, h) : moon(w, h)
   const buffers = Object.values(layers).map((a) => a.buffer as ArrayBuffer)
-  ;(self as unknown as Worker).postMessage({ kind, w, h, layers }, buffers)
+  ;(self as unknown as Worker).postMessage({ kind, w, h, layers, ok: true }, buffers)
 }

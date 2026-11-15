@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ORBITS, byId } from '../../shared/catalog.ts'
 import { ownsRole } from '../../shared/game.ts'
 import { getScenario } from '../../shared/scenarios.ts'
+import { fmtHours } from '../../shared/wildfires.ts'
 import { Medal } from '../art.tsx'
 import { computeMetrics } from '../../shared/calc.ts'
 import { CraftView, GraphicsToggle } from '../scene3d.tsx'
@@ -79,6 +80,27 @@ export function Report() {
             </div>
           ))}
         </div>
+
+        {r.fires && r.fires.length > 0 && (
+          <div className="panel">
+            <h3>Real fire replay</h3>
+            <p className="small muted" style={{ marginTop: 0 }}>Real California wildfires from national fire records, replayed against your design. Time is from ignition until the alert reached fire crews on the ground.</p>
+            <table className="fire-table">
+              <thead><tr><th>Fire</th><th>Started</th><th>Size</th><th>Your alert</th><th /></tr></thead>
+              <tbody>
+                {r.fires.map((f) => (
+                  <tr key={f.name}>
+                    <td><b>{f.name}</b><div className="tiny faint">{f.why}</div></td>
+                    <td className="mono">{f.date}</td>
+                    <td className="mono">{f.acres.toLocaleString()} ac</td>
+                    <td className={`mono ${f.alertHours === null ? 'bad' : f.alertHours <= 3 ? 'good' : f.alertHours <= 12 ? 'warn' : 'bad'}`}>{f.alertHours === null ? 'missed' : fmtHours(f.alertHours)}</td>
+                    <td className="mono warn">+{f.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="panel">
           <h3>Objectives</h3>

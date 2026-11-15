@@ -3,6 +3,7 @@ import { activePlayers, ROLE_NAMES, uncoveredRoles } from '../../shared/game.ts'
 import { COMING_SOON, SCENARIOS } from '../../shared/scenarios.ts'
 import { ROLES, type Role } from '../../shared/types.ts'
 import { InviteOverlay, InvitePanel } from '../invite.tsx'
+import { useLiveFires } from '../live.ts'
 import { ScenarioArt } from '../stages.tsx'
 import { ROLE_COLOR, useCtx } from '../ui.tsx'
 
@@ -20,6 +21,7 @@ export function Lobby() {
   const players = activePlayers(state)
   const canStart = !!state.scenarioId && (!team || missing.length === 0)
   const [big, setBig] = useState(false)
+  const live = useLiveFires()
 
   return (
     <main className="page lobby">
@@ -34,6 +36,8 @@ export function Lobby() {
             return (
               <button key={s.id} className={`scenario ${sel ? 'sel' : ''}`} onClick={() => dispatch({ type: 'chooseScenario', scenarioId: s.id })} aria-pressed={sel}>
                 <ScenarioArt id={s.id} />
+                {s.id === 'wildfire' && live && <span className="live-chip"><i />Live: {live.count.toLocaleString()} fire detections in California, last {live.window === '24h' ? '24 h' : '7 days'} · NASA FIRMS</span>}
+                {s.id === 'wildfire' && <span className="small muted">Replays 8 real California wildfires (2018–2025) against your design.</span>}
                 <div className="row"><h2>{s.name}</h2><span className="spacer" /><span className={`small diff-${s.difficulty}`}>{s.difficulty}</span></div>
                 <div className="muted small">{s.objective}</div>
                 <div className="facts">

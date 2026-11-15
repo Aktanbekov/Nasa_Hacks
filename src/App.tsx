@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ROLE_NAMES } from '../shared/game.ts'
 import { getScenario } from '../shared/scenarios.ts'
 import { InviteOverlay } from './invite.tsx'
+import { SourcesOverlay } from './screens/Sources.tsx'
 import { Briefing } from './screens/Briefing.tsx'
 import { Design } from './screens/Design.tsx'
 import { FlightCalc } from './screens/FlightCalc.tsx'
@@ -23,6 +24,8 @@ export default function App() {
   })
   const { state, dispatch, error, connected, now } = useGame(session, playerId, name)
   const [invite, setInvite] = useState(false)
+  const [sources, setSources] = useState(false)
+  const sourcesOverlay = sources && <SourcesOverlay onClose={() => setSources(false)} />
 
   useEffect(() => {
     if (session?.mode === 'team') {
@@ -40,7 +43,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <Home name={name} setName={(n) => { setName(n); try { localStorage.setItem('lw-name', n) } catch { /* private mode */ } }} onStart={setSession} />
+    return <><Home onSources={() => setSources(true)} name={name} setName={(n) => { setName(n); try { localStorage.setItem('lw-name', n) } catch { /* private mode */ } }} onStart={setSession} />{sourcesOverlay}</>
   }
   if (!state) {
     return (
@@ -76,7 +79,9 @@ export default function App() {
           </div>
         )}
         {state.mode === 'solo' && me && <RoleChip role="lead" label="Solo: all four roles" />}
+        <button className="btn ghost sm" onClick={() => setSources(true)} title="Where the numbers come from">Sources</button>
         <button className="btn ghost sm" onClick={leave}>Exit</button>
+        {sourcesOverlay}
       </header>
       {error && <div className="page error">{error}</div>}
       {state.phase === 'lobby' && <Lobby />}

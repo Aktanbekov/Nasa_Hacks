@@ -265,6 +265,9 @@ export interface SimState {
   history: SimPoint[]
   log: { day: number; text: string; tone: 'good' | 'bad' | 'info' }[]
   eventSchedule: { day: number; templateId: string; instrumentId?: string }[]
+  /** Real wildfires replayed during the mission (Wildfire Watch only). */
+  fireSchedule: { day: number; fireIndex: number }[]
+  fires: import('./wildfires.ts').FireOutcome[]
   decisions: { templateId: string; optionId: string; quality: number }[]
 }
 
@@ -277,6 +280,8 @@ export interface Report {
   objectives: { id: string; name: string; kind: 'primary' | 'bonus'; met: boolean; detail: string }[]
   why: { text: string; tone: 'good' | 'bad' | 'info' }[]
   matches: (RealMission & { similarity: number })[]
+  /** Real wildfire replay results (Wildfire Watch only). */
+  fires?: { name: string; date: string; acres: number; lat: number; lon: number; seenHours: number | null; alertHours: number | null; by: string | null; why: string; points: number }[]
   stats: { label: string; value: string }[]
   launchFailed: boolean
 }

@@ -3,6 +3,7 @@
 import { ADCS, ANTENNAS, BATTERIES, NETWORKS, PROPULSION, ROCKETS, RULES, SOLAR, STORAGE, byId } from './catalog.ts'
 import { computeMetrics, downlinkPerDay, fmtM, parts, pointingQuality, r1 } from './calc.ts'
 import type { Design, GameState, Report, Scenario, SimState, Tier } from './types.ts'
+import { fireDate, fmtHours, WILDFIRES } from './wildfires.ts'
 
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
 const pct = (x: number) => `${Math.round(x * 100)}%`
@@ -86,6 +87,21 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
       ? `Autopilot flew the burn${calc.twrOk ? '; liftoff check correct' : ''}.`
       : `Burn ${Math.round((1 - Math.abs(calc.ratio - 1)) * 100)}% accurate${calc.twrOk ? ', liftoff check correct' : ', liftoff check missed'} (up to 80).`,
   } : null
+  // Real wildfire replay: fires the mission never reached count as missed.
+  const fires: NonNullable<Report['fires']> = !sim || launchFailed ? [] : (sim.fireSchedule ?? []).map((f) => {
+    const out = (sim.fires ?? []).find((o) => o.fireIndex === f.fireIndex)
+    const fr = WILDFIRES[f.fireIndex]
+    return {
+      name: fr.name, date: fireDate(fr), acres: fr.acres, lat: fr.lat, lon: fr.lon,
+      seenHours: out?.seenHours ?? null, alertHours: out?.alertHours ?? null, by: out?.by ?? null,
+      why: out?.why ?? 'The mission had already ended.', points: out?.points ?? 0,
+    }
+  })
+  const fireRow = fires.length ? {
+    label: 'Real fire replay',
+    points: Math.min(100, fires.reduce((a, f) => a + f.points, 0)),
+    detail: `${fires.filter((f) => f.alertHours !== null && f.alertHours <= 3).length}/${fires.length} real fires alerted within 3 hours (up to 12 points each).`,
+  } : null
   const breakdown: Report['breakdown'] = launchFailed
     ? [
         { label: 'Science delivered', points: 0, detail: 'The rocket failed. No science reached the ground.' },
@@ -94,6 +110,7 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
         { label: 'Engineering margins', points: marginPts, detail: 'Credit for a sound design.' },
         { label: 'Teamwork & ops calls', points: Math.round(teamPts / 2), detail: 'Partial credit.' },
         ...(calcRow ? [calcRow] : []),
+        ...(fireRow ? [fireRow] : []),
       ]
     : [
         { label: 'Science delivered', points: sciencePts, detail: `From ${p.instruments.length} instrument${p.instruments.length === 1 ? '' : 's'}, counting only data that reached the ground.` },
@@ -102,6 +119,7 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
         { label: 'Engineering margins', points: marginPts, detail: `Mass ${pct(massMargin)}, power ${pct(powerMargin)}, downlink ${pct(dataMargin)} (20%+ each is full marks).` },
         { label: 'Teamwork & ops calls', points: teamPts, detail: `${decisions.length} event decision${decisions.length === 1 ? '' : 's'}${state.reviewAttempts <= 1 ? ', passed review first try' : ''}${everyoneBuilt ? (state.mode === 'team' ? ', every role contributed' : ', clean review') : ''}.` },
         ...(calcRow ? [calcRow] : []),
+        ...(fireRow ? [fireRow] : []),
       ]
   const score = breakdown.reduce((s, b) => s + b.points, 0)
 
@@ -156,6 +174,11 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
       }
     } else why.push({ tone: 'good', text: `The spacecraft survived all ${scenario.lifetimeYears} years with ${Math.round(sim.health)}% health.` })
 
+    if (fires.length) {
+      const fast = fires.filter((f) => f.alertHours !== null && f.alertHours <= 3).length
+      const best = fires.filter((f) => f.alertHours !== null).sort((a, b) => a.alertHours! - b.alertHours!)[0]
+      why.push({ tone: fast >= fires.length / 2 ? 'good' : 'bad', text: `Real fire replay: your design would have alerted crews within 3 hours for ${fast} of ${fires.length} real California fires${best ? `, fastest the ${best.name} (${fmtHours(best.alertHours!)})` : ''}.` })
+    }
     if (calc && calc.grade !== 'autopilot') {
       why.push({ tone: calc.grade === 'bullseye' || calc.grade === 'good' ? 'good' : 'bad', text: `Flight math: ${calc.verdict} ${calc.effect}` })
     }
@@ -191,7 +214,7 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
     { label: 'Final health', value: `${Math.round(sim.health)}%` },
   ] : [{ label: 'Final cost', value: `${fmtM(finalCost)} / ${fmtM(scenario.budgetM)}` }]
 
-  return { tier, score, breakdown, objectives, why: why.slice(0, 7), matches, stats, launchFailed }
+  return { tier, score, breakdown, objectives, why: why.slice(0, 8), matches, stats, launchFailed, fires }
 }
 
 // Look up the antenna / network change that gives 25%+ downlink margin for the least money.

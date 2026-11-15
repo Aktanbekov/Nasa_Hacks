@@ -23,26 +23,29 @@ function cached<T>(key: string, make: () => T): T {
   return cache.get(key) as T
 }
 
-// ---------- planets (painted in a background worker) ----------
+// ---------- planets ----------
+// Earth and Moon use real NASA maps from /public/textures (see the Sources page).
+// The procedural painter in the worker is the fallback if those can't load.
 type Layers = Record<string, Uint8ClampedArray>
+type Painted = { w: number; h: number; layers: Layers; ok: boolean }
 let worker: Worker | null = null
-const jobs = new Map<string, Promise<{ w: number; h: number; layers: Layers }>>()
-const waiting = new Map<string, (v: { w: number; h: number; layers: Layers }) => void>()
+const jobs = new Map<string, Promise<Painted>>()
+const waiting = new Map<string, (v: Painted) => void>()
 
-function paint(kind: 'earth' | 'moon', w: number, h: number) {
+function paint(kind: 'earth' | 'moon' | 'earth-nasa', w: number, h: number, urls?: string[]) {
   const key = `${kind}-${w}`
   if (!jobs.has(key)) {
     jobs.set(key, new Promise((resolve) => {
       if (!worker) {
         worker = new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' })
-        worker.onmessage = (e: MessageEvent<{ kind: string; w: number; h: number; layers: Layers }>) => {
+        worker.onmessage = (e: MessageEvent<Painted & { kind: string }>) => {
           const k = `${e.data.kind}-${e.data.w}`
           waiting.get(k)?.(e.data)
           waiting.delete(k)
         }
       }
       waiting.set(key, resolve)
-      worker.postMessage({ kind, w, h })
+      worker.postMessage({ kind, w, h, urls })
     }))
   }
   return jobs.get(key)!
@@ -54,16 +57,29 @@ function layerTexture(data: Uint8ClampedArray, w: number, h: number, srgb = true
   return toTexture(c, srgb)
 }
 
-export interface EarthTex { map: THREE.Texture; roughness: THREE.Texture; clouds: THREE.Texture }
-export interface MoonTex { map: THREE.Texture }
+export interface EarthTex { map: THREE.Texture; roughness: THREE.Texture; clouds: THREE.Texture; nasa: boolean }
+export interface MoonTex { map: THREE.Texture; nasa: boolean }
+
+const asset = (p: string) => new URL(p, location.href).href
 
 export function loadEarthTextures(): Promise<EarthTex> {
-  return cached('earth', () => paint('earth', 1024, 512).then(({ w, h, layers }) => ({
-    map: layerTexture(layers.day, w, h), roughness: layerTexture(layers.rough, w, h, false), clouds: layerTexture(layers.clouds, w, h),
-  })))
+  return cached('earth', async () => {
+    const real = await paint('earth-nasa', 2048, 1024, [asset('/textures/earth_day_2048.jpg'), asset('/textures/earth_clouds_src_2048.jpg')])
+    const { w, h, layers } = real.ok ? real : await paint('earth', 1024, 512)
+    return { map: layerTexture(layers.day, w, h), roughness: layerTexture(layers.rough, w, h, false), clouds: layerTexture(layers.clouds, w, h), nasa: real.ok }
+  })
 }
+
 export function loadMoonTextures(): Promise<MoonTex> {
-  return cached('moon', () => paint('moon', 1024, 512).then(({ w, h, layers }) => ({ map: layerTexture(layers.day, w, h) })))
+  return cached('moon', () => new Promise<MoonTex>((resolve) => {
+    new THREE.TextureLoader().load(asset('/textures/moon_lroc_2048.jpg'), (t) => {
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = 4
+      resolve({ map: t, nasa: true })
+    }, undefined, () => {
+      paint('moon', 1024, 512).then(({ w, h, layers }) => resolve({ map: layerTexture(layers.day, w, h), nasa: false }))
+    })
+  }))
 }
 
 /** Returns the textures once the worker has painted them (null until then). */

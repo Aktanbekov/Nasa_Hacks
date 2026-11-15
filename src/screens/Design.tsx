@@ -261,7 +261,7 @@ function LeadPanel({ design, sc, m }: PanelProps) {
             const o = byId(ORBITS, id)
             const blocked = p.rocket.onlyOrbits && !p.rocket.onlyOrbits.includes(id)
             return (
-              <OptionCard key={id} art={<PartArt id={id} />} selected={design.orbitId === id} locked={locked} onClick={() => set({ orbitId: id })} name={o.name} blurb={o.blurb}
+              <OptionCard key={id} art={<PartArt id={id} />} basis={id} selected={design.orbitId === id} locked={locked} onClick={() => set({ orbitId: id })} name={o.name} blurb={o.blurb}
                 note={blocked ? `${p.rocket.name} can't go here` : undefined}
                 stats={<>
                   <Stat k="eclipse" v={`${o.eclipseMin} min`} />
@@ -279,7 +279,7 @@ function LeadPanel({ design, sc, m }: PanelProps) {
             const r = byId(ROCKETS, id)
             const cap = r.onlyOrbits && !r.onlyOrbits.includes(design.orbitId) && !r.onlyOrbits.some((o) => sc.orbits.includes(o)) ? 0 : r.capacity[p.orbit.dest]
             return (
-              <OptionCard key={id} art={<PartArt id={id} />} selected={design.rocketId === id} locked={locked} onClick={() => set({ rocketId: id })} name={r.name} blurb={r.blurb}
+              <OptionCard key={id} art={<PartArt id={id} />} basis={id} selected={design.rocketId === id} locked={locked} onClick={() => set({ rocketId: id })} name={r.name} blurb={r.blurb}
                 note={r.onlyOrbits ? 'Sets the orbit to 600 km sun-synchronous' : cap === 0 ? 'Cannot reach this orbit' : undefined}
                 stats={<>
                   <Stat k="lifts" v={cap ? `${cap} kg` : '—'} />
@@ -347,7 +347,7 @@ function SciencePanel({ design, sc }: PanelProps) {
             const q = p.orbit.quality[inst.kind] ?? 1
             const blurry = p.adcs.accuracyDeg > inst.pointingDeg
             return (
-              <OptionCard key={inst.id} art={<PartArt id={inst.id} kind={inst.kind} />} multi selected={on} locked={locked} onClick={() => dispatch({ type: 'toggleInstrument', instrumentId: inst.id })} name={inst.name} blurb={inst.blurb}
+              <OptionCard key={inst.id} art={<PartArt id={inst.id} kind={inst.kind} />} basis={inst.id} multi selected={on} locked={locked} onClick={() => dispatch({ type: 'toggleInstrument', instrumentId: inst.id })} name={inst.name} blurb={inst.blurb}
                 note={on && blurry ? `Needs ${inst.pointingDeg}° pointing: current system gives ${p.adcs.accuracyDeg}°` : q < 0.8 ? `Only ${Math.round(q * 100)}% as useful from this orbit` : q > 1.05 ? `${Math.round(q * 100)}% as useful from this orbit` : undefined}
                 stats={<>
                   <span className="dot" style={{ background: INSTRUMENT_COLORS[k % INSTRUMENT_COLORS.length], alignSelf: 'center' }} />
@@ -378,7 +378,7 @@ function EngineerPanel({ design, sc, m }: PanelProps) {
       <Section title="Spacecraft bus" hint="The frame, computer and wiring. Bigger buses carry more but weigh and cost more.">
         <div className="options">
           {BUSES.map((b) => (
-            <OptionCard key={b.id} art={<PartArt id={b.id} />} selected={design.busId === b.id} locked={locked} onClick={() => set({ busId: b.id })} name={b.name} blurb={b.blurb}
+            <OptionCard key={b.id} art={<PartArt id={b.id} />} basis={b.id} selected={design.busId === b.id} locked={locked} onClick={() => set({ busId: b.id })} name={b.name} blurb={b.blurb}
               note={design.busId === b.id && (m.slotsUsed > b.slots || m.payloadKg > b.maxPayloadKg) ? 'Instruments don\'t fit' : undefined}
               stats={<><Stat k="" v={`${b.massKg} kg`} /><Stat k="" v={fmtM(b.costM)} /><Stat k="uses" v={`${b.basePowerW} W`} /><Stat k="slots" v={b.slots} /><Stat k="payload" v={`${b.maxPayloadKg} kg`} /></>} />
           ))}
@@ -387,7 +387,7 @@ function EngineerPanel({ design, sc, m }: PanelProps) {
       <Section title="Solar arrays" hint={<>Average power after <Term id="eclipse">eclipse</Term> and charging losses at this orbit.</>}>
         <div className="options">
           {SOLAR.map((s) => (
-            <OptionCard key={s.id} art={<PartArt id={s.id} />} selected={design.solarId === s.id} locked={locked} onClick={() => set({ solarId: s.id })} name={s.name} blurb={s.blurb}
+            <OptionCard key={s.id} art={<PartArt id={s.id} />} basis={s.id} selected={design.solarId === s.id} locked={locked} onClick={() => set({ solarId: s.id })} name={s.name} blurb={s.blurb}
               stats={<><Stat k="avg" v={`${Math.round(s.outputW * sunFrac * RULES.chargeEfficiency)} W`} /><Stat k="" v={`${s.massKg} kg`} /><Stat k="" v={fmtM(s.costM)} /></>} />
           ))}
         </div>
@@ -397,7 +397,7 @@ function EngineerPanel({ design, sc, m }: PanelProps) {
           {BATTERIES.map((b) => {
             const dod = m.eclipseNeedWh / b.capacityWh
             return (
-              <OptionCard key={b.id} art={<PartArt id={b.id} />} selected={design.batteryId === b.id} locked={locked} onClick={() => set({ batteryId: b.id })} name={b.name} blurb={b.blurb}
+              <OptionCard key={b.id} art={<PartArt id={b.id} />} basis={b.id} selected={design.batteryId === b.id} locked={locked} onClick={() => set({ batteryId: b.id })} name={b.name} blurb={b.blurb}
                 note={dod > RULES.maxDepthOfDischarge ? 'Too small for the current eclipse load' : undefined}
                 stats={<><Stat k="drains" v={`${Math.round(dod * 100)}%`} /><Stat k="" v={`${b.massKg} kg`} /><Stat k="" v={fmtM(b.costM)} /></>} />
             )
@@ -407,7 +407,7 @@ function EngineerPanel({ design, sc, m }: PanelProps) {
       <Section title={<Term id="pointing">Pointing control</Term>}>
         <div className="options">
           {ADCS.map((a) => (
-            <OptionCard key={a.id} art={<PartArt id={a.id} />} selected={design.adcsId === a.id} locked={locked} onClick={() => set({ adcsId: a.id })} name={a.name} blurb={a.blurb}
+            <OptionCard key={a.id} art={<PartArt id={a.id} />} basis={a.id} selected={design.adcsId === a.id} locked={locked} onClick={() => set({ adcsId: a.id })} name={a.name} blurb={a.blurb}
               note={!a.worksAt.includes(p.orbit.dest) ? 'Does not work at this orbit' : undefined}
               stats={<><Stat k="aim" v={`${a.accuracyDeg}°`} /><Stat k="" v={`${a.powerW} W`} /><Stat k="" v={`${a.massKg} kg`} /><Stat k="" v={fmtM(a.costM)} /></>} />
           ))}
@@ -419,7 +419,7 @@ function EngineerPanel({ design, sc, m }: PanelProps) {
             const after = pr.deltaV - p.orbit.insertionDv
             const life = after < 0 ? 0 : (p.orbit.stationKeepingDv > 0 ? after / p.orbit.stationKeepingDv : 99) + p.orbit.naturalLifeYears
             return (
-              <OptionCard key={pr.id} art={<PartArt id={pr.id} />} selected={design.propulsionId === pr.id} locked={locked} onClick={() => set({ propulsionId: pr.id })} name={pr.name} blurb={pr.blurb}
+              <OptionCard key={pr.id} art={<PartArt id={pr.id} />} basis={pr.id} selected={design.propulsionId === pr.id} locked={locked} onClick={() => set({ propulsionId: pr.id })} name={pr.name} blurb={pr.blurb}
                 note={after < 0 ? `Can't brake into this orbit (needs ${p.orbit.insertionDv} m/s)` : undefined}
                 stats={<><Stat k="Δv" v={`${pr.deltaV} m/s`} /><Stat k="life here" v={after < 0 ? '0' : life > 30 ? '30+ yr' : `${r1(life)} yr`} /><Stat k="" v={`${pr.massKg} kg`} /><Stat k="" v={fmtM(pr.costM)} /></>} />
             )
@@ -450,7 +450,7 @@ function CommsPanel({ design, sc, m }: PanelProps) {
       <Section title="Antenna" hint={`Rates shown ${where}.`}>
         <div className="options">
           {ANTENNAS.map((a) => (
-            <OptionCard key={a.id} art={<PartArt id={a.id} />} selected={design.antennaId === a.id} locked={locked} onClick={() => set({ antennaId: a.id })} name={a.name} blurb={a.blurb}
+            <OptionCard key={a.id} art={<PartArt id={a.id} />} basis={a.id} selected={design.antennaId === a.id} locked={locked} onClick={() => set({ antennaId: a.id })} name={a.name} blurb={a.blurb}
               note={a.rateMbps[p.orbit.comms] === 0 ? 'Too weak to be heard from here' : undefined}
               stats={<>
                 <Stat k="rate" v={`${a.rateMbps[p.orbit.comms]} Mbps`} />
@@ -466,7 +466,7 @@ function CommsPanel({ design, sc, m }: PanelProps) {
             const g = byId(NETWORKS, id)
             const min = g.contactMin[p.orbit.comms]
             return (
-              <OptionCard key={id} art={<PartArt id={id} />} selected={design.groundId === id} locked={locked} onClick={() => set({ groundId: id })} name={g.name} blurb={g.blurb}
+              <OptionCard key={id} art={<PartArt id={id} />} basis={id} selected={design.groundId === id} locked={locked} onClick={() => set({ groundId: id })} name={g.name} blurb={g.blurb}
                 note={min === 0 ? 'Can\'t reach a spacecraft here' : undefined}
                 stats={<>
                   <Stat k="contact" v={min >= 1440 ? '24 h/day' : `${min} min/day`} />
@@ -480,7 +480,7 @@ function CommsPanel({ design, sc, m }: PanelProps) {
       <Section title={<Term id="storage">Data recorder</Term>} hint="Holds data between passes and through outages.">
         <div className="options">
           {STORAGE.map((s) => (
-            <OptionCard key={s.id} art={<PartArt id={s.id} />} selected={design.storageId === s.id} locked={locked} onClick={() => set({ storageId: s.id })} name={s.name} blurb={s.blurb}
+            <OptionCard key={s.id} art={<PartArt id={s.id} />} basis={s.id} selected={design.storageId === s.id} locked={locked} onClick={() => set({ storageId: s.id })} name={s.name} blurb={s.blurb}
               stats={<><Stat k="holds" v={dataPerSat > 0 ? `${r1(s.capacityGB / dataPerSat)} days` : `${s.capacityGB} GB`} /><Stat k="" v={`${s.massKg} kg`} /><Stat k="" v={fmtM(s.costM)} /></>} />
           ))}
         </div>

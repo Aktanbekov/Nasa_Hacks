@@ -4,6 +4,7 @@ import { RULES } from './catalog.ts'
 import { computeMetrics, downlinkPerDay, parts } from './calc.ts'
 import { hashRand } from './rng.ts'
 import type { Design, PendingEvent, Scenario, SimState } from './types.ts'
+import { detectFire, fmtHours, scheduleFires, WILDFIRES } from './wildfires.ts'
 
 export function initSim(design: Design, scenario: Scenario, seed: number): SimState {
   const p = parts(design, scenario)
@@ -37,6 +38,8 @@ export function initSim(design: Design, scenario: Scenario, seed: number): SimSt
     endDayCap: 1e9, history: [{ day: 0, generated: 0, downlinked: 0, lost: 0, battery: 100, health: 100, powerOk: 1 }],
     log: [{ day: 0, text: 'Spacecraft deployed. Systems check: all green.', tone: 'good' }],
     eventSchedule, decisions: [],
+    fireSchedule: scenario.id === 'wildfire' ? scheduleFires(seed, plannedDays) : [],
+    fires: [],
   }
 }
 
@@ -128,6 +131,22 @@ export function stepDay(sim: SimState, design: Design, scenario: Scenario, seed:
   if (powerShort && sim.powerShortDays === 1) sim.log.push({ day, text: 'Power shortfall: instruments throttled to keep the spacecraft alive.', tone: 'bad' })
   if (eclipseShort && sim.eclipseShortDays === 1) sim.log.push({ day, text: 'Battery can\'t cover the eclipse: instruments cut during shadow passes.', tone: 'bad' })
   if (day === Math.round(sim.plannedDays / 2)) sim.log.push({ day, text: 'Halfway through the mission.', tone: 'info' })
+
+  // Real wildfire replay: did this design spot the fire, and how fast did the alert reach the ground?
+  for (const f of sim.fireSchedule ?? []) {
+    if (f.day !== day) continue
+    const out = detectFire(f.fireIndex, day, design, scenario, sim, seed)
+    sim.fires.push(out)
+    const fire = WILDFIRES[f.fireIndex]
+    const year = fire.discoveredUtc.slice(0, 4)
+    sim.log.push({
+      day,
+      text: out.alertHours === null
+        ? `🔥 Real fire replay: ${fire.name} (${year}, ${fire.acres.toLocaleString()} acres). Missed: ${out.why}`
+        : `🔥 Real fire replay: ${fire.name} (${year}, ${fire.acres.toLocaleString()} acres). Seen ${fmtHours(out.seenHours!)} after ignition, alert on the ground after ${fmtHours(out.alertHours)}.`,
+      tone: out.alertHours !== null && out.alertHours <= 6 ? 'good' : 'bad',
+    })
+  }
 
   // End conditions
   if (sim.health <= 0) { sim.health = 0; end(sim, 'Spacecraft lost: power or hardware failure.') }
