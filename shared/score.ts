@@ -78,6 +78,14 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
     : m.checks.every((c) => c.status === 'pass')
   const teamPts = Math.round(decisionAvg * 60 + (state.reviewAttempts <= 1 ? 20 : 0) + (everyoneBuilt ? 20 : 0))
 
+  const calc = state.calc?.result
+  const calcRow = calc ? {
+    label: 'Flight math',
+    points: calc.points,
+    detail: calc.grade === 'autopilot'
+      ? `Autopilot flew the burn${calc.twrOk ? '; liftoff check correct' : ''}.`
+      : `Burn ${Math.round((1 - Math.abs(calc.ratio - 1)) * 100)}% accurate${calc.twrOk ? ', liftoff check correct' : ', liftoff check missed'} (up to 80).`,
+  } : null
   const breakdown: Report['breakdown'] = launchFailed
     ? [
         { label: 'Science delivered', points: 0, detail: 'The rocket failed. No science reached the ground.' },
@@ -85,6 +93,7 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
         { label: 'Budget efficiency', points: 0, detail: `${fmtM(finalCost)} spent.` },
         { label: 'Engineering margins', points: marginPts, detail: 'Credit for a sound design.' },
         { label: 'Teamwork & ops calls', points: Math.round(teamPts / 2), detail: 'Partial credit.' },
+        ...(calcRow ? [calcRow] : []),
       ]
     : [
         { label: 'Science delivered', points: sciencePts, detail: `From ${p.instruments.length} instrument${p.instruments.length === 1 ? '' : 's'}, counting only data that reached the ground.` },
@@ -92,6 +101,7 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
         { label: 'Budget efficiency', points: budgetPts, detail: left >= 0 ? `${fmtM(left)} left of ${fmtM(scenario.budgetM)}.` : `${fmtM(-left)} over budget.` },
         { label: 'Engineering margins', points: marginPts, detail: `Mass ${pct(massMargin)}, power ${pct(powerMargin)}, downlink ${pct(dataMargin)} (20%+ each is full marks).` },
         { label: 'Teamwork & ops calls', points: teamPts, detail: `${decisions.length} event decision${decisions.length === 1 ? '' : 's'}${state.reviewAttempts <= 1 ? ', passed review first try' : ''}${everyoneBuilt ? (state.mode === 'team' ? ', every role contributed' : ', clean review') : ''}.` },
+        ...(calcRow ? [calcRow] : []),
       ]
   const score = breakdown.reduce((s, b) => s + b.points, 0)
 
@@ -146,6 +156,9 @@ export function buildReport(state: GameState, scenario: Scenario): Report {
       }
     } else why.push({ tone: 'good', text: `The spacecraft survived all ${scenario.lifetimeYears} years with ${Math.round(sim.health)}% health.` })
 
+    if (calc && calc.grade !== 'autopilot') {
+      why.push({ tone: calc.grade === 'bullseye' || calc.grade === 'good' ? 'good' : 'bad', text: `Flight math: ${calc.verdict} ${calc.effect}` })
+    }
     for (const d of sim.decisions) {
       if (d.templateId === 'budget-cut' && d.optionId === 'reserve') why.push({ tone: 'good', text: 'Keeping a budget reserve let you absorb the funding cut with no loss of science.' })
       if (d.templateId === 'solar-storm' && d.quality < 0.3) why.push({ tone: 'bad', text: 'Observing through the solar storm damaged the spacecraft. Safe mode costs a few days but protects the mission.' })

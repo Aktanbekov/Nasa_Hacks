@@ -36,6 +36,8 @@ for (const [k, t] of designs.entries()) {
     s.design = design
     reduce(s, { type: 'goReview', playerId: 'p' }, now)
     reduce(s, { type: 'launch', playerId: 'p' }, now)
+    reduce(s, { type: 'submitCalc', playerId: 'p', twr: null, burn: null, autopilot: true }, now)
+    reduce(s, { type: 'beginLaunch', playerId: 'p' }, now)
     let guard = 0
     while (s.phase !== 'report' && guard++ < 100000) {
       now += 1000

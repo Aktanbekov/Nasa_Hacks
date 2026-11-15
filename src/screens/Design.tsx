@@ -112,13 +112,14 @@ type StageView = 'craft' | 'rocket' | 'orbit'
 function Gauge({ icon, label, value, sub, frac, tone, mark }: { icon: Parameters<typeof HudIcon>[0]['name']; label: ReactNode; value: string; sub: ReactNode; frac: number; tone: 'good' | 'bad' | 'warn' | 'info'; mark?: number }) {
   return (
     <div className={`gauge ${tone}`}>
-      <span className="gauge-icon"><HudIcon name={icon} /></span>
-      <div className="gauge-body">
-        <div className="gauge-label">{label}</div>
-        <div className="gauge-value">{value}</div>
-        <div className="gauge-bar"><i style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%` }} />{mark !== undefined && <span style={{ left: `${mark * 100}%` }} />}</div>
-        <div className="gauge-sub">{sub}</div>
+      <div className="gauge-head">
+        <span className="gauge-icon"><HudIcon name={icon} /></span>
+        <span className="gauge-label">{label}</span>
+        <span className="led" aria-label={tone === 'bad' ? 'problem' : tone === 'warn' ? 'warning' : 'ok'} />
       </div>
+      <div className="gauge-value">{value}</div>
+      <div className="gauge-bar"><i style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%` }} />{mark !== undefined && <span style={{ left: `${mark * 100}%` }} />}</div>
+      <div className="gauge-sub">{sub}</div>
     </div>
   )
 }
@@ -129,7 +130,9 @@ export function Hud({ design, sc, m, overtime }: { design: DesignT; sc: Scenario
   const dataPerSat = m.dataGBPerDay / design.satellites
   const downPerSat = m.downlinkGBPerDay / design.satellites
   return (
-    <div className="hud" aria-label="Shared dashboard">
+    <section className="console" aria-label="Shared dashboard">
+      <div className="console-title"><span>Ship status</span><span className="console-live">● Live</span></div>
+      <div className="hud">
       <Gauge icon="budget" label="Budget" value={`${fmtM(m.costM)}`} frac={m.costM / m.budgetM}
         tone={m.costM > m.budgetM ? 'bad' : m.costM > m.budgetM * 0.95 ? 'warn' : 'good'}
         sub={overtime > 0 ? <span className="bad">+{fmtM(overtime)} <Term id="standingarmy">late</Term></span> : `of ${fmtM(m.budgetM)}`} />
@@ -152,7 +155,8 @@ export function Hud({ design, sc, m, overtime }: { design: DesignT; sc: Scenario
         <Gauge icon="eye" label={<Term id="revisit">Looks/day</Term>} value={m.revisitPerDay > 50 ? 'nonstop' : `${r1(m.revisitPerDay)}`} frac={m.revisitPerDay / (revisitGoal * 2)} mark={0.5}
           tone={m.revisitPerDay >= revisitGoal ? 'good' : 'bad'} sub={`need ${revisitGoal}`} />
       )}
-    </div>
+      </div>
+    </section>
   )
 }
 

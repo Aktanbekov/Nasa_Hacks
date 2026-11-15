@@ -5,6 +5,7 @@ import { canLaunch, computeMetrics, describeChange } from './calc.ts'
 import { hashRand, newSeed } from './rng.ts'
 import { getScenario } from './scenarios.ts'
 import { buildReport } from './score.ts'
+import { applyCalc, buildChallenge, gradeCalc } from './flightcalc.ts'
 import { initSim, resolveEvent, stepDay } from './sim.ts'
 import type { Design, FeedItem, GameState, Role } from './types.ts'
 import { ROLES } from './types.ts'
@@ -42,6 +43,8 @@ export type Action =
   | { type: 'backToDesign'; playerId: string }
   | { type: 'approve'; playerId: string; value: boolean }
   | { type: 'launch'; playerId: string }
+  | { type: 'submitCalc'; playerId: string; twr: number | null; burn: number | null; autopilot: boolean }
+  | { type: 'beginLaunch'; playerId: string }
   | { type: 'vote'; playerId: string; optionId: string }
   | { type: 'decide'; playerId: string; optionId: string }
   | { type: 'setSpeed'; speed: number }
@@ -52,7 +55,7 @@ export type Action =
 export function createGame(code: string, mode: 'solo' | 'team', now: number): GameState {
   return {
     code, mode, phase: 'lobby', scenarioId: null, relaxed: false, players: {}, hostId: '',
-    design: null, designStartedAt: 0, overtimeM: 0, opsAcc: 0, feed: [], feedSeq: 0, approvals: {}, ready: {}, reviewAttempts: 0,
+    design: null, designStartedAt: 0, overtimeM: 0, opsAcc: 0, feed: [], feedSeq: 0, approvals: {}, ready: {}, calc: null, reviewAttempts: 0,
     launch: null, sim: null, pendingEvent: null, votes: {}, speed: 1, paused: false, report: null,
     seed: newSeed(), flight: 1, rev: 0, now,
   }
@@ -91,6 +94,7 @@ function startDesign(s: GameState, now: number) {
 export function reduce(s: GameState, a: Action, now: number): GameState {
   s.now = now
   if (!s.ready) s.ready = {} // rooms saved before the briefing phase existed
+  if (s.calc === undefined) s.calc = null
   switch (a.type) {
     case 'join': {
       const existing = s.players[a.playerId]
@@ -210,7 +214,23 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       const sc = getScenario(s.scenarioId)
       if (!canLaunch(computeMetrics(s.design, sc))) break
       if (s.mode === 'team' && !activePlayers(s).every((p) => s.approvals[p.id])) break
+      // Review passed: program the flight computer before liftoff.
       s.overtimeM = overtimeCost(s, now)
+      s.calc = { challenge: buildChallenge(s.design, sc), result: null }
+      s.phase = 'calc'
+      push(s, { role: 'system', text: 'Design approved. Program the flight computer: liftoff check and burn time.', tone: 'info' })
+      break
+    }
+    case 'submitCalc': {
+      if (s.phase !== 'calc' || !s.calc || s.calc.result) break
+      const by = s.players[a.playerId]?.name ?? 'The team'
+      s.calc.result = gradeCalc(s.calc.challenge, a.twr, a.burn, a.autopilot, by)
+      const r = s.calc.result
+      push(s, { role: 'system', who: s.mode === 'team' ? by : undefined, text: r.grade === 'autopilot' ? 'Flight computer set to autopilot.' : `Burn programmed: ${Math.round(r.burnAnswer ?? 0)} s. ${r.verdict}`, tone: r.grade === 'bullseye' || r.grade === 'good' ? 'good' : r.grade === 'autopilot' ? 'info' : 'bad' })
+      break
+    }
+    case 'beginLaunch': {
+      if (s.phase !== 'calc' || !s.calc?.result || !s.design || !isLead(s, a.playerId)) break
       const rocket = byId(ROCKETS, s.design.rocketId)
       const success = hashRand(s.seed, 'launch', s.flight) < rocket.reliability
       s.launch = { success, at: now }
@@ -256,7 +276,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       if (s.phase !== 'report' || !s.scenarioId) break
       s.flight += 1
       s.seed = newSeed()
-      s.sim = null; s.report = null; s.launch = null; s.pendingEvent = null; s.votes = {}
+      s.sim = null; s.report = null; s.launch = null; s.pendingEvent = null; s.votes = {}; s.calc = null
       s.reviewAttempts = 0; s.overtimeM = 0; s.speed = 1; s.paused = false
       push(s, { role: 'system', text: `Flight ${s.flight}: redesign the mission and fly again.`, tone: 'info' })
       startDesign(s, now)
@@ -265,7 +285,7 @@ export function reduce(s: GameState, a: Action, now: number): GameState {
       if (s.phase !== 'report') break
       s.phase = 'lobby'
       s.scenarioId = null; s.design = null; s.sim = null; s.report = null; s.launch = null
-      s.pendingEvent = null; s.votes = {}; s.reviewAttempts = 0; s.overtimeM = 0; s.flight = 1; s.seed = newSeed()
+      s.pendingEvent = null; s.votes = {}; s.reviewAttempts = 0; s.overtimeM = 0; s.flight = 1; s.seed = newSeed(); s.calc = null
       s.feed = []
       break
   }
@@ -300,6 +320,7 @@ export function tick(s: GameState, now: number, dtMs: number): boolean {
       finish(s, sc)
     } else {
       s.sim = initSim(s.design!, sc, s.seed)
+      if (s.calc?.result) s.sim.log.push({ day: 0, text: applyCalc(s.sim, s.calc.result, s.design!, sc), tone: s.calc.result.grade === 'off' || s.calc.result.grade === 'wayoff' ? 'bad' : 'good' })
       s.phase = 'ops'
       s.opsAcc = 0
       push(s, { role: 'system', text: 'Orbit reached. Operations begin.', tone: 'good' })

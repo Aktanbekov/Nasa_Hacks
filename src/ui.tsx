@@ -80,7 +80,7 @@ export function OptionCard({ selected, locked, onClick, name, blurb, stats, note
 }
 
 const STEPS: { phase: Phase; label: string }[] = [
-  { phase: 'lobby', label: 'Mission' }, { phase: 'briefing', label: 'Briefing' }, { phase: 'design', label: 'Design' }, { phase: 'review', label: 'Review' },
+  { phase: 'lobby', label: 'Mission' }, { phase: 'briefing', label: 'Briefing' }, { phase: 'design', label: 'Design' }, { phase: 'review', label: 'Review' }, { phase: 'calc', label: 'Flight plan' },
   { phase: 'launch', label: 'Launch' }, { phase: 'ops', label: 'Operations' }, { phase: 'report', label: 'Report' },
 ]
 export function Steps({ phase }: { phase: Phase }) {

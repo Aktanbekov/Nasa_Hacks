@@ -1,6 +1,7 @@
 // Team invite: a scannable QR code + link for joining a room from a phone or laptop.
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const LOCAL = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 
@@ -37,7 +38,7 @@ export function useJoinUrl(code: string) {
   return { url, sameMachineOnly: isLocal && host === here.host }
 }
 
-export function QrCode({ text, size = 200 }: { text: string; size?: number }) {
+export function QrCode({ text, size = 200 }: { text: string; size?: number | string }) {
   const [svg, setSvg] = useState('')
   useEffect(() => {
     let live = true
@@ -47,7 +48,7 @@ export function QrCode({ text, size = 200 }: { text: string; size?: number }) {
     return () => { live = false }
   }, [text])
   return (
-    <div className="qr" style={{ width: size, height: size }} role="img" aria-label={`QR code for ${text}`}
+    <div className="qr" style={{ width: size }} role="img" aria-label={`QR code for ${text}`}
       // The SVG markup is generated locally by the qrcode library from our own join URL.
       dangerouslySetInnerHTML={{ __html: svg }} />
   )
@@ -64,7 +65,7 @@ export function InvitePanel({ code, big = false, onExpand }: { code: string; big
   return (
     <div className={`invite ${big ? 'big' : ''}`}>
       <div className="invite-qr">
-        {url ? <QrCode text={url} size={big ? 340 : 168} /> : <div className="qr placeholder" style={{ width: big ? 340 : 168, height: big ? 340 : 168 }} />}
+        {url ? <QrCode text={url} size={big ? 'min(64vh, 80vw, 560px)' : '100%'} /> : <div className="qr placeholder" style={{ width: big ? 'min(64vh, 80vw, 560px)' : '100%' }} />}
       </div>
       <div className="invite-info">
         {big && <div className="invite-kicker">Scan to join the team</div>}
@@ -90,12 +91,14 @@ export function InviteOverlay({ code, onClose }: { code: string; onClose: () => 
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
   }, [onClose])
-  return (
+  // Portal to <body>: panels use backdrop blur, which would trap a fixed overlay inside them.
+  return createPortal(
     <div className="modal-back invite-overlay" role="dialog" aria-modal="true" aria-label="Invite teammates" onClick={onClose}>
       <div className="modal invite-modal" onClick={(e) => e.stopPropagation()}>
         <button className="btn ghost sm invite-close" onClick={onClose} aria-label="Close">✕</button>
         <InvitePanel code={code} big />
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -48,6 +48,17 @@ act({ type: 'launch', playerId: 'ben' })
 assert.equal(s.phase, 'review', 'only the lead launches')
 s.seed = 7 // a seed where the rideshare launch succeeds
 act({ type: 'launch', playerId: 'ada' })
+assert.equal(s.phase, 'calc', 'flight plan comes before liftoff')
+const ch = s.calc!.challenge
+act({ type: 'beginLaunch', playerId: 'ada' })
+assert.equal(s.phase, 'calc', 'cannot launch before the burn is programmed')
+// Ben solves it with a formula string evaluated on his side, exactly right
+act({ type: 'submitCalc', playerId: 'ben', twr: ch.twr.answer, burn: ch.burn.answer, autopilot: false })
+assert.equal(s.calc!.result!.grade, 'bullseye')
+assert.equal(s.calc!.result!.points, 80)
+act({ type: 'beginLaunch', playerId: 'ben' })
+assert.equal(s.phase, 'calc', 'only the lead launches')
+act({ type: 'beginLaunch', playerId: 'ada' })
 assert.equal(s.phase, 'launch')
 
 let events = 0

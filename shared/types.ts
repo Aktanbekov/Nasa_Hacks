@@ -281,7 +281,7 @@ export interface Report {
   launchFailed: boolean
 }
 
-export type Phase = 'lobby' | 'briefing' | 'design' | 'review' | 'launch' | 'ops' | 'report'
+export type Phase = 'lobby' | 'briefing' | 'design' | 'review' | 'calc' | 'launch' | 'ops' | 'report'
 
 export interface GameState {
   code: string
@@ -301,6 +301,8 @@ export interface GameState {
   approvals: Record<string, boolean>
   /** Players who finished the story briefing and are ready to design. */
   ready: Record<string, boolean>
+  /** Flight-plan mini-game: the physics problems and the team's result. */
+  calc: import('./flightcalc.ts').FlightCalc | null
   reviewAttempts: number
   launch: { success: boolean; at: number } | null
   sim: SimState | null

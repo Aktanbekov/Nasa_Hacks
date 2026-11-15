@@ -4,6 +4,7 @@ import { getScenario } from '../shared/scenarios.ts'
 import { InviteOverlay } from './invite.tsx'
 import { Briefing } from './screens/Briefing.tsx'
 import { Design } from './screens/Design.tsx'
+import { FlightCalc } from './screens/FlightCalc.tsx'
 import { Home } from './screens/Home.tsx'
 import { Launch } from './screens/Launch.tsx'
 import { Lobby } from './screens/Lobby.tsx'
@@ -82,6 +83,7 @@ export default function App() {
       {state.phase === 'briefing' && <Briefing />}
       {state.phase === 'design' && <Design />}
       {state.phase === 'review' && <Review />}
+      {state.phase === 'calc' && state.calc && <FlightCalc />}
       {state.phase === 'launch' && <Launch />}
       {state.phase === 'ops' && <Ops />}
       {state.phase === 'report' && <Report />}
