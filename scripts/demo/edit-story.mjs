@@ -1,11 +1,14 @@
 // Story cuts: a cold open from clean story footage, then the gameplay walkthrough,
 // each shot placed at the start time its narration line needs.
-// Usage: node edit-story.mjs <short|full> <outFile> [mainTake=take2] [coldTake=take-cold]
+// Usage: node edit-story.mjs <short|full|vo> <outFile> [mainTake=take2] [coldTake=take-cold] [voDir]
+// The vo cut times every shot to the voiceover lines in <voDir>/times.json (from voice.mjs) and mixes <voDir>/voice.wav in.
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const [cut = 'full', outFile = 'story.mp4', mainTake = 'take2', coldTake = 'take-cold'] = process.argv.slice(2)
+const [cut = 'full', outFile = 'story.mp4', mainTake = 'take2', coldTake = 'take-cold', voDir] = process.argv.slice(2)
+const VO = voDir ? JSON.parse(fs.readFileSync(path.resolve(voDir, 'times.json'), 'utf8')).map((l) => l.start) : null
+if (cut === 'vo' && !VO) throw new Error('the vo cut needs a voDir from voice.mjs')
 const marks = (t) => Object.fromEntries(JSON.parse(fs.readFileSync(path.resolve(t, 'marks-rel.json'), 'utf8')).map((m) => [m.name, m.s]))
 const SRC = { main: path.resolve(mainTake, 'master.mp4'), cold: path.resolve(coldTake, 'master.mp4') }
 const M = marks(mainTake)
@@ -14,7 +17,7 @@ const OV = path.resolve('overlays')
 const WORK = path.resolve(mainTake, `work-story-${cut}`)
 fs.rmSync(WORK, { recursive: true, force: true })
 fs.mkdirSync(WORK, { recursive: true })
-const XF = cut === 'short' ? 0.3 : 0.4
+const XF = cut === 'full' ? 0.4 : 0.3
 const ff = (args) => execFileSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', ...args], { stdio: 'inherit' })
 
 // Each entry: [startTime, piece]. A piece's on-screen length = next start - this start + crossfade.
@@ -56,6 +59,20 @@ const TIMELINES = {
     [23.0, shot('main', M.qr - 0.2, M.qr + 2.6, 's_team')],
     [25.6, card('outro', 'cold', C.earth3d + 1.0)],
     [29.8, null],
+  ],
+  // Lines (VO index): 0 date, 1 canyon, 2 Dixie, 3 what if, 4 title, 5 team, 6 parts, 7 math, 8 launch, 9 fires, 10 solo, 11 closing.
+  vo: VO && [
+    [0.0, shot('cold', C.night + 0.4, C.night + 5.6, 'cold_date')],
+    [VO[2] - 0.25, shot('cold', C.map + 0.3, C.map + 4.5, 'cold_dixie')],
+    [VO[3] - 0.25, shot('cold', C.sat + 0.3, C.sat + 3.4, 'cold_question')],
+    [VO[4] - 0.3, card('intro', 'main', M.basis + 1.5)],
+    [VO[5] - 0.25, shot('main', M.built - 10.0, M.built, 's_design')],
+    [VO[7] - 0.55, shot('main', M['calc-result'] + 0.3, M['calc-result'] + 2.0)],
+    [VO[8] - 0.2, shot('main', M.launch + 2.2, M.launch + 4.6)],
+    [VO[9] + 0.6, shot('main', M.fires + 0.2, M.fires + 4.0, 's_fires')],
+    [VO[10] - 0.15, shot('main', M.qr - 0.2, M.qr + 2.6, 's_team')],
+    [VO[11] - 0.15, card('outro', 'cold', C.earth3d + 1.0)],
+    [29.6, null],
   ],
 }
 const TL = TIMELINES[cut]
@@ -111,5 +128,13 @@ const audio = path.join(WORK, 'audio.m4a')
 ff(['-f', 'lavfi', '-i', `aevalsrc=${L}|${R}:s=48000:d=${total}`,
   '-af', `lowpass=f=900,aecho=0.8:0.7:420|780:0.25|0.18,volume='if(lt(t,${titleAt}),1.1,2.2)':eval=frame,afade=t=in:st=0:d=3,afade=t=out:st=${(total - 3).toFixed(2)}:d=3`,
   '-c:a', 'aac', '-b:a', '160k', audio])
-ff(['-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', path.resolve(outFile)])
+if (voDir) {
+  // voiceover on top; the pad ducks under the voice and sits lower overall
+  ff(['-i', video, '-i', audio, '-i', path.resolve(voDir, 'voice.wav'), '-filter_complex',
+    `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.55[pad];[2:a]aformat=sample_rates=48000:channel_layouts=stereo,apad=whole_dur=${total},asplit[v][sc];` +
+    `[pad][sc]sidechaincompress=threshold=0.02:ratio=5:attack=30:release=500[duck];[duck][v]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.9[a]`,
+    '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', String(total), '-movflags', '+faststart', path.resolve(outFile)])
+} else {
+  ff(['-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', path.resolve(outFile)])
+}
 console.log(`${cut} story cut: ${pieces.length} pieces, ${total} s -> ${outFile}`)

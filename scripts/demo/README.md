@@ -16,10 +16,11 @@ node master.mjs take            # constant 30 fps master.mp4 + marks relative to
 node coldopen.mjs take-cold     # clean full-screen story scenes + 3D Earth for the cold open
 node master.mjs take-cold
 node overlays.mjs               # caption, cold-open and title PNGs in the game's HUD style
-node edit-story.mjs short ../../demo/launch-window-demo.mp4 take take-cold
+node voice.mjs ../../demo/voiceover.mp3 vo   # fit the ElevenLabs voiceover: tighter pauses, 1.15x, line times
+node edit-story.mjs vo ../../demo/launch-window-demo.mp4 take take-cold vo
 ```
 
-The result is one 29.8-second video (Space Apps limit: 30 s).
-Shot start times in `edit-story.mjs` (the `short` timeline) match the line start times in `demo/voiceover-script.md`.
-If your recorded narration runs longer or shorter, move those start times and re-render.
-Captions live in `overlays.mjs`. The soundtrack is a generated ambient pad (no licensing); swap it for your voiceover.
+The result is one 29.6-second video (Space Apps limit: 30 s) with the voiceover over a generated ambient pad that ducks under the voice.
+`voice.mjs` expects the 12 lines in `demo/voiceover-script.md`; the `vo` timeline in `edit-story.mjs` cuts each shot to its line's start time, so a new recording re-times the video on its own.
+Without a voiceover, `node edit-story.mjs short <out> take take-cold` renders the 29.8 s cut with the pad only.
+Captions live in `overlays.mjs`.

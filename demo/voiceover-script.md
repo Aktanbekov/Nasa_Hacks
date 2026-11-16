@@ -1,6 +1,6 @@
 # Launch Window: 30-second video narration
 
-Video: `demo/launch-window-demo.mp4` (29.8 s, 1920×1080).
+Video: `demo/launch-window-demo.mp4` (29.6 s, 1920×1080), narrated with the ElevenLabs take in `demo/voiceover.mp3` (Adam Stone, sped up 1.15× with tighter pauses to fit).
 Space Apps rule: the video pitch must be **no longer than 30 seconds**, hosted at a public link (YouTube or Google Drive).
 Source: [Space Apps project submission guide](https://www.spaceappschallenge.org/resources/project-submission-guide/).
 
