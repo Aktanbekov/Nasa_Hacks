@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createGame, reduce, tick, TICK_MS, type Action } from '../shared/game.ts'
 import type { GameState } from '../shared/types.ts'
+import { api } from './api.ts'
 
 export type Session = { mode: 'solo' } | { mode: 'team'; code: string }
 
@@ -49,7 +50,7 @@ export function useGame(session: Session | null, playerId: string, name: string)
   useEffect(() => {
     if (!code) return
     setError(null)
-    const es = new EventSource(`/api/rooms/${code}/stream?player=${encodeURIComponent(playerId)}&name=${encodeURIComponent(name)}`)
+    const es = new EventSource(api(`/api/rooms/${code}/stream?player=${encodeURIComponent(playerId)}&name=${encodeURIComponent(name)}`))
     es.onopen = () => setConnected(true)
     es.onmessage = (e) => {
       const s = JSON.parse(e.data) as GameState
@@ -58,7 +59,7 @@ export function useGame(session: Session | null, playerId: string, name: string)
     }
     es.onerror = () => {
       setConnected(false)
-      fetch(`/api/rooms/${code}`).then((r) => {
+      fetch(api(`/api/rooms/${code}`)).then((r) => {
         if (r.status === 404) { setError('Room not found. It may have expired.'); es.close() }
       }).catch(() => {})
     }
@@ -71,7 +72,7 @@ export function useGame(session: Session | null, playerId: string, name: string)
       reduce(local.current, action, Date.now())
       force((n) => n + 1)
     } else if (code) {
-      fetch(`/api/rooms/${code}/action`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(action) })
+      fetch(api(`/api/rooms/${code}/action`), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(action) })
         .catch(() => setError('Lost connection to the room server.'))
     }
   }, [session?.mode, code, playerId])
@@ -81,7 +82,8 @@ export function useGame(session: Session | null, playerId: string, name: string)
 }
 
 export async function createRoom(): Promise<string> {
-  const r = await fetch('/api/rooms', { method: 'POST' })
-  if (!r.ok) throw new Error('Could not reach the room server. Is it running?')
+  // A free-tier host may take up to a minute to wake the room server, so allow for that.
+  const r = await fetch(api('/api/rooms'), { method: 'POST', signal: AbortSignal.timeout(75_000) }).catch(() => null)
+  if (!r?.ok) throw new Error('Could not reach the room server. Is it running?')
   return (await r.json()).code
 }

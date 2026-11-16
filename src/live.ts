@@ -1,6 +1,7 @@
 // Live NASA FIRMS fire detections over California, via our server (cached there for 20 minutes).
 import { useEffect, useState } from 'react'
 import type { LiveFires } from '../shared/wildfires.ts'
+import { api } from './api.ts'
 
 let pending: Promise<LiveFires | null> | null = null
 let last: { at: number; data: LiveFires | null } | null = null
@@ -8,7 +9,7 @@ let last: { at: number; data: LiveFires | null } | null = null
 function load(): Promise<LiveFires | null> {
   if (last && Date.now() - last.at < 10 * 60 * 1000) return Promise.resolve(last.data)
   if (!pending) {
-    pending = fetch('/api/fires/live')
+    pending = fetch(api('/api/fires/live'))
       .then((r) => (r.ok ? (r.json() as Promise<LiveFires>) : null))
       .catch(() => null)
       .then((d) => { last = { at: Date.now(), data: d && !d.error ? d : null }; pending = null; return last.data })

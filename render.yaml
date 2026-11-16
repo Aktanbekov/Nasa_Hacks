@@ -1,0 +1,14 @@
+# Render Blueprint for the Launch Window room server (team play).
+# It also serves the full game, so its URL works on its own as a backup link.
+# The Vercel site points at it with VITE_SERVER_URL (see README, "Deploy").
+services:
+  - type: web
+    name: launch-window
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/info
+    envVars:
+      - key: NODE_VERSION
+        value: "24"

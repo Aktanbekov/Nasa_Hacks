@@ -135,6 +135,13 @@ const server = createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean)
   try {
     if (parts[0] !== 'api') return serveStatic(req, res)
+    // The site may be hosted elsewhere (e.g. Vercel) and call this server directly.
+    // Rooms hold no credentials, so any origin may use the API.
+    res.setHeader('access-control-allow-origin', '*')
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' })
+      return res.end()
+    }
 
     // GET /api/fires/live -> NASA FIRMS active-fire detections inside California
     if (req.method === 'GET' && parts[1] === 'fires' && parts[2] === 'live') return json(res, 200, await liveFires())

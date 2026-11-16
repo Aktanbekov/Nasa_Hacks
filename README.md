@@ -21,6 +21,19 @@ npm run balance              # flies reference designs through the sim and print
 
 Requires Node 23.6+ (the server runs TypeScript directly via type stripping).
 
+## Deploy
+
+Solo play is fully static, but team rooms need the Node room server running somewhere that keeps long-lived
+connections open (static hosts such as Vercel can't run it).
+
+1. **Room server on Render** (free): New → Blueprint → pick this repo. `render.yaml` builds and starts it.
+   Its URL (e.g. `https://launch-window.onrender.com`) also serves the whole game.
+2. **Site on Vercel**: Project → Settings → Environment Variables → add `VITE_SERVER_URL` = the Render URL
+   (no trailing slash), then redeploy. The site then creates and joins rooms on that server.
+
+Render's free tier sleeps after 15 idle minutes; the first team room after that can take about a minute while it wakes.
+Open the Render URL once before a demo to wake it.
+
 ## How it works
 
 | Folder | What's there |

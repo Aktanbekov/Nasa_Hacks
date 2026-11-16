@@ -2,6 +2,7 @@
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { api } from './api.ts'
 
 const LOCAL = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 
@@ -9,7 +10,7 @@ const LOCAL = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 let lanPromise: Promise<string | null> | null = null
 function lanAddress(): Promise<string | null> {
   if (!lanPromise) {
-    lanPromise = fetch('/api/info')
+    lanPromise = fetch(api('/api/info'))
       .then((r) => r.json())
       .then((d: { addresses: string[] }) => {
         const usable = d.addresses.filter((a) => !a.startsWith('169.254.'))

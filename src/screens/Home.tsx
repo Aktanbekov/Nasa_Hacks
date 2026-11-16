@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api.ts'
 import { createRoom, type Session } from '../transport.ts'
 import { Logo } from '../ui.tsx'
 
@@ -17,7 +18,7 @@ export function Home({ name, setName, onStart, onSources }: { name: string; setN
     const c = raw.trim().toUpperCase()
     setBusy(true); setError(null)
     try {
-      const r = await fetch(`/api/rooms/${c}`)
+      const r = await fetch(api(`/api/rooms/${c}`)).catch(() => { throw new Error('Could not reach the room server. Try again in a minute.') })
       if (!r.ok) throw new Error('No room with that code. Check it with your team.')
       onStart({ mode: 'team', code: c })
     } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
