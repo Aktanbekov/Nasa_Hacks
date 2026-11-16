@@ -2,3 +2,7 @@ node_modules
 dist
 .DS_Store
 .data
+scripts/demo/node_modules
+scripts/demo/take*
+scripts/demo/overlays
+scripts/demo/package*.json
