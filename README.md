@@ -15,24 +15,25 @@ Open http://localhost:5173. For team play on a LAN, teammates open the "Network"
 
 ```bash
 npm run build && npm start   # production: one Node server serves the app and the rooms (PORT, default 8787)
-npm test                     # headless team-rules check (roles, approvals, voting)
+npm test                     # team rules + room API (concurrent actions, clock catch-up, presence)
 npm run balance              # flies reference designs through the sim and prints reports
 ```
 
 Requires Node 23.6+ (the server runs TypeScript directly via type stripping).
 
-## Deploy
+## Deploy (Vercel)
 
-Solo play is fully static, but team rooms need the Node room server running somewhere that keeps long-lived
-connections open (static hosts such as Vercel can't run it).
+Push to GitHub and import the repo in Vercel; the default settings work. During a Vercel build,
+`npm run build` also writes `.vercel/output/` (see `scripts/vercel-output.mjs`): the static site plus one
+function that serves every `/api` route.
 
-1. **Room server on Render** (free): New → Blueprint → pick this repo. `render.yaml` builds and starts it.
-   Its URL (e.g. `https://launch-window.onrender.com`) also serves the whole game.
-2. **Site on Vercel**: Project → Settings → Environment Variables → add `VITE_SERVER_URL` = the Render URL
-   (no trailing slash), then redeploy. The site then creates and joins rooms on that server.
+Solo play works straight away. **Team rooms need a database:** in the Vercel project open **Storage →
+Upstash for Redis (Marketplace) → Create / Connect**, connect it to this project, then **redeploy**. The function reads
+`KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`). Without them,
+creating a team room shows a message saying so.
 
-Render's free tier sleeps after 15 idle minutes; the first team room after that can take about a minute while it wakes.
-Open the Render URL once before a demo to wake it.
+Team players poll the room about once a second. Each request loads the room, catches the game clock up to now,
+applies the action and saves with a compare-and-set, so there is no long-running server to keep awake.
 
 ## How it works
 
@@ -44,7 +45,9 @@ Open the Render URL once before a demo to wake it.
 | `shared/sim.ts` | Day-by-day operations sim (power, battery wear, data flow, fuel) and random events |
 | `shared/score.ts` | Mission report: score, tier, "why it happened", real-world match |
 | `shared/game.ts` | Game state machine shared by server (team) and browser (solo) |
-| `server/server.ts` | Zero-dependency room server: actions over POST, live state over SSE, rooms saved to `.data/` |
+| `server/rooms.ts` | Team-room API shared by both hosts: polling, actions, compare-and-set saves, memory and Upstash Redis stores |
+| `server/server.ts` | Local zero-dependency Node server: room API with rooms in memory (saved to `.data/`), serves the built app |
+| `server/vercel.ts` | The same API as a Vercel Function (rooms in Upstash Redis) |
 | `src/` | React UI, one screen per phase |
 
 The same reducer runs in the browser for solo play and on the server for team rooms, and all randomness is seeded,

@@ -7,10 +7,10 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
     "dev:server": "node --watch server/server.ts",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/vercel-output.mjs",
     "start": "NODE_ENV=production node server/server.ts",
     "balance": "node scripts/balance.ts",
-    "test": "node scripts/team-test.ts",
+    "test": "node scripts/team-test.ts && node scripts/rooms-test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

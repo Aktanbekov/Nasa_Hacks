@@ -1,124 +1,58 @@
-// Team-room server: holds each room's game state, applies player actions with
-// the shared reducer, runs the clock, and streams state to browsers over SSE.
-// Zero dependencies: plain node:http. In production it also serves the built app.
+// Local game server: serves the room API (server/rooms.ts) from one Node process with rooms in
+// memory, saved to .data/ so they survive a restart mid-demo. In production (`npm start`) it also
+// serves the built app. On Vercel the same API runs as a function instead (server/vercel.ts).
+// Zero dependencies: plain node:http.
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createGame, reduce, tick, TICK_MS, type Action } from '../shared/game.ts'
-import type { GameState } from '../shared/types.ts'
-import { inCalifornia, type Hotspot, type LiveFires } from '../shared/wildfires.ts'
-
-// ---- Live wildfire detections from NASA FIRMS (public files, no account needed) ----
-const FIRMS = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire'
-const FEEDS = {
-  '24h': [
-    ['VIIRS NOAA-20', `${FIRMS}/noaa-20-viirs-c2/csv/J1_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv`],
-    ['VIIRS NOAA-21', `${FIRMS}/noaa-21-viirs-c2/csv/J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv`],
-    ['MODIS Terra/Aqua', `${FIRMS}/modis-c6.1/csv/MODIS_C6_1_USA_contiguous_and_Hawaii_24h.csv`],
-  ],
-  '7d': [['VIIRS NOAA-20', `${FIRMS}/noaa-20-viirs-c2/csv/J1_VIIRS_C2_USA_contiguous_and_Hawaii_7d.csv`]],
-} as const
-let liveCache: { at: number; data: LiveFires } | null = null
-
-async function fetchFeed(label: string, url: string): Promise<Hotspot[]> {
-  const r = await fetch(url, { signal: AbortSignal.timeout(20000) })
-  if (!r.ok) throw new Error(`${label}: HTTP ${r.status}`)
-  const [head, ...rows] = (await r.text()).trim().split('\n')
-  const cols = head.split(',')
-  const at = (name: string) => cols.indexOf(name)
-  const iLat = at('latitude'), iLon = at('longitude'), iFrp = at('frp'), iDate = at('acq_date'), iTime = at('acq_time'), iDn = at('daynight')
-  const out: Hotspot[] = []
-  for (const row of rows) {
-    const c = row.split(',')
-    const lat = parseFloat(c[iLat]), lon = parseFloat(c[iLon])
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !inCalifornia(lat, lon)) continue
-    const t = (c[iTime] ?? '').padStart(4, '0')
-    out.push({ lat, lon, frp: parseFloat(c[iFrp]) || 0, sat: label, when: `${c[iDate]}T${t.slice(0, 2)}:${t.slice(2)}Z`, night: c[iDn] === 'N' })
-  }
-  return out
-}
-
-async function liveFires(): Promise<LiveFires> {
-  if (liveCache && Date.now() - liveCache.at < 20 * 60 * 1000) return liveCache.data
-  const load = async (window: '24h' | '7d') => {
-    const results = await Promise.allSettled(FEEDS[window].map(([l, u]) => fetchFeed(l, u)))
-    const ok = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
-    const feeds = FEEDS[window].filter((_, i) => results[i].status === 'fulfilled').map(([l]) => l)
-    return { ok, feeds, failed: results.every((r) => r.status === 'rejected') }
-  }
-  let window: '24h' | '7d' = '24h'
-  let res = await load('24h')
-  if (!res.failed && res.ok.length === 0) { window = '7d'; res = await load('7d') }
-  const data: LiveFires = res.failed
-    ? { updated: new Date().toISOString(), window, count: 0, hotspots: [], feeds: [], error: 'NASA FIRMS could not be reached.' }
-    : { updated: new Date().toISOString(), window, count: res.ok.length, hotspots: res.ok.sort((a, b) => b.frp - a.frp).slice(0, 400), feeds: res.feeds }
-  if (!res.failed) liveCache = { at: Date.now(), data }
-  return data
-}
-
+import { handleApi, memoryStore, type RoomRecord } from './rooms.ts'
 
 const PORT = Number(process.env.GAME_PORT ?? process.env.PORT ?? 8787)
 const DIST = fileURLToPath(new URL('../dist', import.meta.url))
 const SAVE_FILE = fileURLToPath(new URL('../.data/rooms.json', import.meta.url))
 
-interface Room { state: GameState; clients: Map<ServerResponse, string>; lastSeen: number }
-const rooms = new Map<string, Room>()
-
-// ---- Persistence: rooms survive a server restart (e.g. mid-demo) ----
-let dirty = false
-function saveRooms() {
-  if (!dirty) return
-  dirty = false
-  const out: Record<string, GameState> = {}
-  for (const [code, room] of rooms) out[code] = room.state
-  try {
-    mkdirSync(dirname(SAVE_FILE), { recursive: true })
-    writeFileSync(SAVE_FILE + '.tmp', JSON.stringify(out))
-    renameSync(SAVE_FILE + '.tmp', SAVE_FILE)
-  } catch (err) { console.error('Could not save rooms:', err) }
-}
+// ---- Rooms in memory, saved to disk every few seconds ----
+let saved: Record<string, RoomRecord> = {}
 try {
   if (existsSync(SAVE_FILE)) {
-    const saved = JSON.parse(readFileSync(SAVE_FILE, 'utf8')) as Record<string, GameState>
-    for (const [code, state] of Object.entries(saved)) {
-      for (const p of Object.values(state.players)) p.connected = false
-      rooms.set(code, { state, clients: new Map(), lastSeen: Date.now() })
-    }
-    if (rooms.size) console.log(`Restored ${rooms.size} room(s)`)
+    const raw = JSON.parse(readFileSync(SAVE_FILE, 'utf8')) as Record<string, RoomRecord>
+    // Older saves held bare game states; wrap them.
+    for (const [code, r] of Object.entries(raw)) saved[code] = 'state' in r ? r : { state: r as unknown as RoomRecord['state'], lastTick: Date.now() }
+    if (Object.keys(saved).length) console.log(`Restored ${Object.keys(saved).length} room(s)`)
   }
-} catch (err) { console.error('Could not restore rooms:', err) }
+} catch (err) { console.error('Could not restore rooms:', err); saved = {} }
+const { store, dump } = memoryStore(saved)
+let lastSave = ''
+function saveRooms() {
+  const out = JSON.stringify(dump())
+  if (out === lastSave) return
+  try {
+    mkdirSync(dirname(SAVE_FILE), { recursive: true })
+    writeFileSync(SAVE_FILE + '.tmp', out)
+    renameSync(SAVE_FILE + '.tmp', SAVE_FILE)
+    lastSave = out
+  } catch (err) { console.error('Could not save rooms:', err) }
+}
 setInterval(saveRooms, 3000)
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => { saveRooms(); process.exit(0) })
 
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-function newCode() {
-  let code = ''
-  do { code = Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('') } while (rooms.has(code))
-  return code
-}
-
-function broadcast(room: Room) {
-  dirty = true
-  const data = `data: ${JSON.stringify(room.state)}\n\n`
-  for (const res of room.clients.keys()) res.write(data)
-}
-
-function json(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, { 'content-type': 'application/json' })
+function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
+  res.writeHead(status, { 'content-type': 'application/json', ...headers })
   res.end(JSON.stringify(body))
 }
 
-async function readBody(req: IncomingMessage): Promise<any> {
+async function readBody(req: IncomingMessage): Promise<unknown> {
   let raw = ''
   for await (const chunk of req) { raw += chunk; if (raw.length > 50_000) throw new Error('too large') }
-  return raw ? JSON.parse(raw) : {}
+  return raw ? JSON.parse(raw) : undefined
 }
 
 const MIME: Record<string, string> = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-  '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.json': 'application/json', '.woff2': 'font/woff2',
 }
 function serveStatic(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://x')
@@ -132,88 +66,24 @@ function serveStatic(req: IncomingMessage, res: ServerResponse) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x')
-  const parts = url.pathname.split('/').filter(Boolean)
-  try {
-    if (parts[0] !== 'api') return serveStatic(req, res)
-    // The site may be hosted elsewhere (e.g. Vercel) and call this server directly.
-    // Rooms hold no credentials, so any origin may use the API.
-    res.setHeader('access-control-allow-origin', '*')
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, { 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' })
-      return res.end()
-    }
-
-    // GET /api/fires/live -> NASA FIRMS active-fire detections inside California
-    if (req.method === 'GET' && parts[1] === 'fires' && parts[2] === 'live') return json(res, 200, await liveFires())
-
-    // GET /api/info -> this machine's network addresses, so join links work from phones
-    if (req.method === 'GET' && parts[1] === 'info') {
-      const addresses = Object.values(networkInterfaces()).flat()
-        .filter((a) => a && a.family === 'IPv4' && !a.internal)
-        .map((a) => a!.address)
-      return json(res, 200, { addresses })
-    }
-
-    // POST /api/rooms -> create a team room
-    if (req.method === 'POST' && parts[1] === 'rooms' && parts.length === 2) {
-      const code = newCode()
-      rooms.set(code, { state: createGame(code, 'team', Date.now()), clients: new Map(), lastSeen: Date.now() })
-      return json(res, 200, { code })
-    }
-
-    const room = parts[1] === 'rooms' ? rooms.get((parts[2] ?? '').toUpperCase()) : undefined
-    if (!room) return json(res, 404, { error: 'Room not found. Check the code.' })
-    room.lastSeen = Date.now()
-
-    // GET /api/rooms/:code -> does the room exist?
-    if (req.method === 'GET' && parts.length === 3) return json(res, 200, { ok: true, phase: room.state.phase })
-
-    // GET /api/rooms/:code/stream?player=..&name=.. -> live state (SSE)
-    if (req.method === 'GET' && parts[3] === 'stream') {
-      const playerId = url.searchParams.get('player') ?? ''
-      const name = (url.searchParams.get('name') ?? 'Player').slice(0, 24)
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no' })
-      res.write('retry: 1500\n\n')
-      room.clients.set(res, playerId)
-      reduce(room.state, { type: 'join', playerId, name }, Date.now())
-      broadcast(room)
-      const ping = setInterval(() => res.write(': ping\n\n'), 15000)
-      req.on('close', () => {
-        clearInterval(ping)
-        room.clients.delete(res)
-        // Only mark disconnected if this player has no other open tab.
-        if (![...room.clients.values()].includes(playerId)) {
-          reduce(room.state, { type: 'disconnect', playerId }, Date.now())
-          broadcast(room)
-        }
-      })
-      return
-    }
-
-    // POST /api/rooms/:code/action
-    if (req.method === 'POST' && parts[3] === 'action') {
-      const action = (await readBody(req)) as Action
-      reduce(room.state, action, Date.now())
-      broadcast(room)
-      return json(res, 200, { ok: true, rev: room.state.rev })
-    }
-    return json(res, 404, { error: 'Not found' })
-  } catch (err) {
-    console.error(err)
-    return json(res, 400, { error: String((err as Error).message ?? err) })
+  if (!url.pathname.startsWith('/api/')) return serveStatic(req, res)
+  // The site may be served from another origin (VITE_SERVER_URL); rooms hold no credentials.
+  const cors = { 'access-control-allow-origin': '*' }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { ...cors, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' })
+    return res.end()
   }
+  // GET /api/info -> this machine's network addresses, so join links work from phones on the LAN
+  if (req.method === 'GET' && url.pathname === '/api/info') {
+    const addresses = Object.values(networkInterfaces()).flat()
+      .filter((a) => a && a.family === 'IPv4' && !a.internal)
+      .map((a) => a!.address)
+    return send(res, 200, { addresses }, cors)
+  }
+  let body: unknown
+  try { body = req.method === 'POST' ? await readBody(req) : undefined } catch { return send(res, 400, { error: 'Bad request body' }, cors) }
+  const out = await handleApi({ method: req.method ?? 'GET', path: url.pathname, query: url.searchParams, body }, store)
+  send(res, out.status, out.body, { ...cors, ...out.headers })
 })
-
-// Game clock for every active room.
-let last = Date.now()
-setInterval(() => {
-  const now = Date.now()
-  const dt = now - last
-  last = now
-  for (const [code, room] of rooms) {
-    if (tick(room.state, now, dt)) broadcast(room)
-    if (room.clients.size === 0 && now - room.lastSeen > 1000 * 60 * 60 * 3) rooms.delete(code)
-  }
-}, TICK_MS)
 
 server.listen(PORT, () => console.log(`Launch Window server on http://localhost:${PORT}`))

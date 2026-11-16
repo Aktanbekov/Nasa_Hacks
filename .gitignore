@@ -6,3 +6,4 @@ scripts/demo/node_modules
 scripts/demo/take*
 scripts/demo/overlays
 scripts/demo/package*.json
+.vercel
