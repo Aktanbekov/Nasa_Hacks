@@ -23,6 +23,14 @@ function lanAddress(): Promise<string | null> {
 }
 
 /**
+ * Host for invite links on a Vercel deployment. Deployment-specific *.vercel.app URLs ask
+ * visitors to sign in to Vercel, so links use the project's public address instead.
+ */
+export function publicHostFor(hostname: string, host: string, publicHost = import.meta.env.VITE_PUBLIC_HOST ?? '') {
+  return publicHost && hostname.endsWith('.vercel.app') ? publicHost : host
+}
+
+/**
  * Link a teammate can open to join the room. When this page runs on
  * localhost, the link uses the computer's network address instead, so phones
  * on the same Wi-Fi can reach it.
@@ -30,12 +38,12 @@ function lanAddress(): Promise<string | null> {
 export function useJoinUrl(code: string) {
   const here = new URL(location.href)
   const isLocal = LOCAL.has(here.hostname)
-  const [host, setHost] = useState<string | null>(isLocal ? null : here.host)
+  const [host, setHost] = useState<string | null>(isLocal ? null : publicHostFor(here.hostname, here.host))
   useEffect(() => {
     if (!isLocal) return
     lanAddress().then((ip) => setHost(ip ? `${ip}${here.port ? `:${here.port}` : ''}` : here.host))
   }, [isLocal, here.host, here.port])
-  const url = host ? `${here.protocol}//${host}${here.pathname}?room=${code}` : null
+  const url = host ? `${here.protocol}//${host}${host === here.host ? here.pathname : '/'}?room=${code}` : null
   return { url, sameMachineOnly: isLocal && host === here.host }
 }
 
